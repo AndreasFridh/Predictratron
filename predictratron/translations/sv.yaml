@@ -1,0 +1,4 @@
+configuration:
+  log_level:
+    name: Loggnivå
+    description: Hur mycket information appen skriver i loggen. Info rekommenderas.

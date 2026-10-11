@@ -1,0 +1,17 @@
+services:
+  predictor:
+    build: .
+    image: predictratron:0.2.0
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - predictor-data:/data
+    restart: unless-stopped
+
+volumes:
+  predictor-data:

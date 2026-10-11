@@ -1,0 +1,4 @@
+configuration:
+  log_level:
+    name: Log level
+    description: Amount of information written to the app log. Info is recommended.

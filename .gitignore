@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+**/data/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+*.pyc
+*.joblib
+*.sqlite3*
+*.tmp
+.DS_Store
