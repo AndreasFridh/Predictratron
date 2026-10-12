@@ -28,6 +28,7 @@ class FlowEditor {
       if(template)this.add(template,this.point(e));
     });
     this.bindPalette();
+    $('browse-ha-signals').onclick=()=>window.entityPicker.open('', entity=>this.add('ha:'+this.entities.findIndex(item=>item.entity_id===entity.entity_id)));
     canvas.addEventListener('pointerdown',e=>this.pointerDown(e));
     window.addEventListener('pointermove',e=>this.pointerMove(e));
     window.addEventListener('pointerup',e=>this.pointerUp(e));
@@ -51,8 +52,6 @@ class FlowEditor {
 
   setEntities(entities) {
     this.entities=entities;
-    $('ha-palette').innerHTML=entities.map((e,i)=>`<button class="palette-signal" draggable="true" data-template="ha:${i}" title="${esc(e.entity_id)}" aria-label="Lägg till ${esc(e.name)}">○ – ${esc(e.name)} <span>(${e.entity_id.startsWith('binary_sensor.')?'Boolean':'Float'})</span></button>`).join('');
-    this.bindPalette();
   }
 
   makeGraph(spec, connected=true) {

@@ -6,6 +6,8 @@
   <title>Predictratron · Home Assistant</title>
   <link rel="stylesheet" href="static/style.css">
   <script defer src="static/app.js"></script>
+  <script defer src="static/entity-search.js"></script>
+  <script defer src="static/entity-picker.js"></script>
   <script defer src="static/flow.js"></script>
   <link rel="stylesheet" href="static/flow.css">
 </head>
@@ -38,7 +40,7 @@
             <button class="palette-signal calendar-palette" draggable="true" data-template="year_day" aria-label="Lägg till Årstid (Integer)">○ – Årstid <span>(Integer)</span></button>
             <div class="palette-group-title">OUTPUT</div>
             <button class="palette-signal output-palette" draggable="true" data-template="output" aria-label="Lägg till outputsignal">○ – Outputsignal <span>(Float)</span></button>
-            <div class="palette-group-title">HOME ASSISTANT</div><div id="ha-palette"><p class="fine">Anslut HA för att välja dina sensorer.</p></div>
+            <div class="palette-group-title">HOME ASSISTANT</div><div id="ha-palette"><button type="button" id="browse-ha-signals" class="secondary">⌕ Sök HA-signaler</button><p class="fine" id="ha-entity-count">Anslut HA för att välja dina sensorer.</p></div>
             <p class="fine">Klick fungerar också. Varje modellinstans har en egen ML-box.</p>
           </aside>
           <div class="canvas-shell">
@@ -104,7 +106,7 @@
       </div>
       <div class="form-section"><h3 id="target-section-title">Målet · det vi vill förutsäga</h3><div class="form-grid three" id="signal-target-fields">
         <label>Namn i modellen<input name="target_key" required pattern="[a-z][a-z0-9_]{0,39}" value="water_level"></label>
-        <label>HA-sensor<input name="target_entity" list="ha-entities" placeholder="sensor.water_level"></label>
+        <label>HA-sensor<span class="entity-field"><input name="target_entity" placeholder="sensor.water_level"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för output">Sök</button></span></label>
         <label>Värde per period<select name="target_stat"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="change">Mätarökning under perioden</option></select></label>
       </div><div class="form-grid three">
         <label>Enhet<input name="unit" placeholder="cm, %, kWh…" maxlength="20"></label>
@@ -133,11 +135,21 @@
       <div class="dialog-footer"><span>En modell kan användas för valfritt numeriskt mål.</span><button type="submit" class="primary">Skapa modell ↗</button></div>
     </form>
   </dialog>
-  <datalist id="ha-entities"></datalist>
+
+  <dialog id="entity-picker" aria-labelledby="entity-picker-title">
+    <div class="dialog-heading"><div><div class="eyebrow">HOME ASSISTANT / SIGNALER</div><h2 id="entity-picker-title">Hitta din signal</h2></div><button type="button" class="close" id="close-entity-picker" aria-label="Stäng signalsökning">×</button></div>
+    <label>Sök namn eller entity-id<input type="search" id="entity-query" maxlength="256" placeholder="sensor.*temp*" aria-describedby="entity-search-help" autocomplete="off"></label>
+    <p class="fine" id="entity-search-help">Vanlig text söker del av namn eller id. Wildcard matchar hela namnet eller id:t: * = valfria tecken, ? = ett tecken. Exempel: sensor.*temp* eller *kök*.</p>
+    <div class="entity-filters"><label>Signaltyp<select id="entity-domain"><option value="">Alla typer</option><option value="sensor">Sensorer</option><option value="binary_sensor">Binära sensorer</option><option value="input_number">Numeriska hjälpare</option></select></label><label class="check-line"><input id="entity-numeric" type="checkbox">Bara användbara ML-signaler</label><button type="button" class="secondary" id="refresh-entities">Uppdatera värden</button></div>
+    <p id="entity-count" class="fine" role="status" aria-live="polite"></p>
+    <div id="entity-results" class="entity-results" aria-label="HA-signaler"></div>
+    <button type="button" class="secondary" id="entity-more" hidden>Visa 50 till</button>
+    <p class="fine">Värden är en ögonblicksbild från HA. Klicka en signal för att välja den. Okända värden visas även när historik kan finnas.</p>
+  </dialog>
   <dialog id="signal-dialog"><form id="signal-form">
     <div class="dialog-heading"><div><div class="eyebrow" id="signal-role">INPUTSIGNAL</div><h2>Signalens inställningar</h2></div><button type="button" class="close" id="close-signal" aria-label="Stäng signalinställningar">×</button></div>
     <div class="form-grid"><label>Signalnamn<input name="label" required maxlength="80" placeholder="Nederbörd"></label><label>Datatyp<select name="data_type"><option value="float">Float · decimaltal</option><option value="int">Integer · heltal</option><option value="bool">Boolean · 0 / 1</option></select></label></div>
-    <div class="form-grid"><label>Kolumnnamn<input name="key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain"></label><label>HA-sensor<input name="entity_id" list="ha-entities" placeholder="sensor.rain"></label></div>
+    <div class="form-grid"><label>Kolumnnamn<input name="key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain"></label><label>HA-sensor<span class="entity-field"><input name="entity_id" placeholder="sensor.rain"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för denna signal">Sök</button></span></label></div>
     <label class="statistic-field">Värde per period<select name="statistic"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="sum">Summa · periodvärden i CSV</option><option value="change">Mätarökning under perioden</option></select></label>
     <p id="signal-note" class="fine">Välj signalens datakälla. Kopplingen till ML-boxen gör du på arbetsytan.</p>
     <div id="signal-error" class="alert" hidden></div>

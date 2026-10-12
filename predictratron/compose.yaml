@@ -1,7 +1,7 @@
 services:
   predictor:
     build: .
-    image: predictratron:0.2.0
+    image: predictratron:0.3.0
     ports:
       - "127.0.0.1:8080:8080"
     env_file:

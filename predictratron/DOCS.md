@@ -269,7 +269,7 @@ köra fler containrar med olika portar och datavolymer, exempelvis:
 
 ```sh
 docker run -d --name predictor-water -p 127.0.0.1:8081:8080 \
-  -v predictor-water-data:/data predictratron:0.2.0
+  -v predictor-water-data:/data predictratron:0.3.0
 ```
 
 Dela inte samma datavolym mellan flera processer eller containrar.
@@ -288,3 +288,19 @@ Källor för anslutningsmetoder och tidsserieutvärdering:
 [HA WebSocket API](https://developers.home-assistant.io/docs/api/websocket/),
 [HA statistik](https://data.home-assistant.io/docs/statistics/),
 [scikit-learn: fördröjda tidsseriefält](https://scikit-learn.org/stable/auto_examples/applications/plot_time_series_lagged_features.html).
+
+## Sök Home Assistant-signaler
+
+Välj **Sök HA-signaler** i signalpaletten, eller **Sök** vid en inputs eller
+outputs HA-sensor. Vanlig text söker i namn och entity-id utan skillnad på stora
+och små bokstäver. Wildcard matchar hela namn eller id: `*` betyder valfria
+tecken och `?` ett tecken. Exempel: `sensor.*temp*`, `*kök*`, `sensor.energ?`.
+
+Resultaten visar senaste värde, enhet och tid för senaste uppdatering i
+webbläsarens tidszon. Filtrera på sensorer, binära sensorer eller numeriska
+hjälpare. 50 resultat visas i taget; sök mer precist eller välj **Visa 50 till**.
+Värden hämtas när väljaren öppnas och med **Uppdatera värden**. Detta är en
+ögonblicksbild, inte en ständig liveuppdatering. Okända och otillgängliga signaler
+kan väljas eftersom historik kan finnas. Textsignaler kan inte väljas; Boolean
+kan bara användas som input. Att välja källa för en signal ändrar först formuläret
+– använd signalen och spara sedan modellen som vanligt.

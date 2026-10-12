@@ -153,7 +153,7 @@ function drawChart(item) {
 
 function addInput(signal={key:'',entity_id:'',statistic:'mean'}) {
   const div=document.createElement('div');div.className='input-row';
-  div.innerHTML=`<label>Namn i modellen<input class="input-key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain" value="${esc(signal.key)}"></label><label>HA-sensor<input class="input-entity" list="ha-entities" placeholder="sensor.rain" value="${esc(signal.entity_id)}"></label><label>Värde per period<select class="input-stat"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="change">Mätarökning</option></select></label><button type="button" class="remove-input" aria-label="Ta bort input">×</button>`;
+  div.innerHTML=`<label>Namn i modellen<input class="input-key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain" value="${esc(signal.key)}"></label><label>HA-sensor<span class="entity-field"><input class="input-entity" placeholder="sensor.rain" value="${esc(signal.entity_id)}"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för input">Sök</button></span></label><label>Värde per period<select class="input-stat"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="change">Mätarökning</option></select></label><button type="button" class="remove-input" aria-label="Ta bort input">×</button>`;
   div.querySelector('.input-stat').value=signal.statistic;
   div.querySelector('.remove-input').onclick=()=>div.remove();
   $('input-rows').append(div);
@@ -231,7 +231,8 @@ $('auth-form').onsubmit=async event=>{
 async function init(){
   try{
     const status=await api('status');$('connection').textContent=status.ha_configured?'HA-anslutning konfigurerad':'CSV och demo · HA ej ansluten';$('connection').classList.toggle('connected',status.ha_configured);
-    if(status.ha_configured){try{const entities=await api('entities');$('ha-entities').innerHTML=entities.map(e=>`<option value="${esc(e.entity_id)}">${esc(e.name)} ${esc(e.unit)}</option>`).join('');window.flowEditor?.setEntities(entities);}catch(error){$('connection').textContent='HA kunde inte nås';toast(error.message);}}
+    window.entityPicker?.setConfigured(status.ha_configured);
+    if(status.ha_configured) await window.entityPicker?.refresh();
     await refresh();
   }catch(error){if(!$('auth-dialog').open)toast(error.message);}
 }

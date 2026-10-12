@@ -144,7 +144,8 @@ class HAClient:
                 attributes = state.get("attributes", {})
                 result.append({"entity_id": state["entity_id"], "name": attributes.get("friendly_name", state["entity_id"]),
                                "unit": attributes.get("unit_of_measurement", ""),
-                               "state_class": attributes.get("state_class"), "state": state["state"]})
+                               "state_class": attributes.get("state_class"), "state": state["state"],
+                               "last_updated": state.get("last_updated"), "last_changed": state.get("last_changed")})
         return result
 
     def history(self, spec):

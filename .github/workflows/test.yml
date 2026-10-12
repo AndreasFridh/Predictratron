@@ -19,7 +19,8 @@ jobs:
           cache-dependency-path: predictratron/requirements*.txt
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
-      - run: node --check app/static/app.js && node --check app/static/flow.js
+      - run: for file in app/static/*.js; do node --check "$file"; done
+      - run: node --test tests/js/*.test.cjs
       - run: docker build --build-arg BUILD_ARCH=amd64 -t predictratron:test .
       - name: Verify standalone container
         run: |

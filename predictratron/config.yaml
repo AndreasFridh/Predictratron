@@ -1,5 +1,5 @@
 name: Predictratron
-version: "0.2.0"
+version: "0.3.0"
 slug: predictratron
 description: Train independent time-series models and predict future values with a visual signal editor.
 url: https://github.com/AndreasFridh/Predictratron

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Replace the long Home Assistant signal list with a searchable signal picker.
+- Support literal name/entity-id search and * / ? wildcards, signal type filters and bounded results.
+- Show latest values, units, update timestamps and unknown/unavailable states.
+- Refresh values on opening the picker or on request; use the same picker for inputs and output.
+
 ## 0.2.0
 
 - Package Predictratron as a Home Assistant app for aarch64 and amd64.

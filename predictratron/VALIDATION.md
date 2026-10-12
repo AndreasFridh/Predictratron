@@ -1,3 +1,17 @@
+# Verifiering — 12 oktober 2026, version 0.3.0
+
+- 57 Python-tester och 6 JavaScript-tester passerade.
+- Wildcard, bokstavsnormalisering, bokstavliga specialtecken, Unicode, typfilter
+  och värdeformatering verifierades i JavaScript-tester.
+- API-test verifierade senaste HA-state, enhet och last_updated/last_changed.
+- Signalsökningen kördes i webbläsaren mot 127 syntetiska HA-signaler: wildcard,
+  senaste värden, otillgänglig signal, typfilter, 50/100 resultat och tom sökning.
+- Signalval från paletten lade till rätt entity-id. Väljaren i signalinställningar
+  fyllde rätt namn, entity-id och Boolean-datatyp med senaste-värde-aggregering.
+- Boolean var spärrad för output, medan numerisk output gick att välja.
+- ARM64-containern byggdes och startades lokalt med befintlig datavolym.
+- Ingen anslutning till verklig HA eller verkliga sensorvärden verifierades här.
+
 # Verifiering — 11 oktober 2026
 
 - 56 automatiska tester passerade.

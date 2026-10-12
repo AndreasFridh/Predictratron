@@ -21,6 +21,7 @@ Home Assistant Ingress.
 
 ## What it does
 
+- Search HA signals by name/entity-id with `*` and `?` wildcards, type filters and latest values.
 - Drag-and-drop signals shown as **○ – Name (Datatype)**.
 - Independent model instances with separate history, training, scores and forecasts.
 - Explicit **Train on history** and **Predict future** actions in each ML box.
@@ -58,6 +59,7 @@ cd predictratron
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
+node --test tests/js/*.test.cjs
 ```
 
 Home Assistant packaging follows the official
