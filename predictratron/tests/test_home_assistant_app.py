@@ -74,7 +74,12 @@ def test_ingress_prefix_and_standalone_assets(tmp_path):
     with TestClient(create_app(tmp_path, HAClient(url='', token=''))) as client:
         page = client.get('/')
         assert '<base href="/">' in page.text
-        assert 'src="static/app.js"' in page.text
+        import re
+        from urllib.parse import urlsplit
+        asset = re.search(r'src="([^"]*app\.js[^"]*)"', page.text).group(1)
+        assert urlsplit(asset).path == 'static/app.js'
+        assert urlsplit(asset).query == 'v=' + client.get('/health').json()['version']
+        assert client.get('/' + asset).status_code == 200
         assert '<title>Predictratron' in page.text
         prefixed = client.get('/', headers={'X-Ingress-Path':'/api/hassio_ingress/test-session'})
         assert '<base href="/api/hassio_ingress/test-session/">' in prefixed.text
