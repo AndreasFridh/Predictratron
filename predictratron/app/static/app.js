@@ -1,18 +1,19 @@
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let models = [], selected = null, chartMode = 'forecast', history = [], historyKey = '', refreshTimer;
+let devMode = false, analysisLimit = 50;
 let token = sessionStorage.getItem('predictor-token') || '';
-const fmt = (value, digits=2) => value == null ? '—' : Number(value).toLocaleString('sv-SE', {maximumFractionDigits:digits});
-const date = (value, includeYear=false) => value ? new Date(value).toLocaleString('sv-SE', {timeZone:current()?.config.timezone || 'Europe/Stockholm', year:includeYear?'numeric':undefined,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const fmt = (value, digits=2) => value == null ? '—' : Number(value).toLocaleString('en-GB', {maximumFractionDigits:digits});
+const date = (value, includeYear=false) => value ? new Date(value).toLocaleString('en-GB', {timeZone:current()?.config.timezone || 'Europe/Stockholm', year:includeYear?'numeric':undefined,month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 const current = () => models.find(m => m.id === selected);
 const stepMinutes = c => ({minute:1,hour:60,day:1440,week:10080}[c.resolution]||c.period_minutes||60);
-const periodName = c => {const minutes=stepMinutes(c);return minutes%10080===0?`${minutes/10080} ${minutes===10080?'vecka':'veckor'}`:minutes%1440===0?`${minutes/1440} dygn`:minutes%60===0?`${minutes/60} ${minutes===60?'timme':'timmar'}`:`${minutes} ${minutes===1?'minut':'minuter'}`;};
-const aggregateName = s => ({mean:'medelvärde',last:'senaste värde',sum:'summa',change:'mätarökning'}[s.statistic]||'medelvärde');
+const periodName = c => {const minutes=stepMinutes(c);return minutes%10080===0?`${minutes/10080} ${minutes===10080?'week':'weeks'}`:minutes%1440===0?`${minutes/1440} ${minutes===1440?'day':'days'}`:minutes%60===0?`${minutes/60} ${minutes===60?'hour':'hours'}`:`${minutes} ${minutes===1?'minute':'minutes'}`;};
+const aggregateName = s => ({mean:'mean',last:'latest value',sum:'sum',change:'meter increment'}[s.statistic]||'mean');
 function updatePeriodPreview(){
   const form=$('model-form'),c={resolution:form.elements.resolution.value,period_minutes:Number(form.elements.period_minutes.value)},h=Number(form.elements.horizon.value);
   $('custom-period-field').hidden=c.resolution!=='custom';
   const signal=window.flowEditor?.graph?.nodes.find(n=>n.kind==='output')?.signal;
-  $('period-preview').textContent=`Varje träningsvärde och prognosvärde avser ${periodName(c)}${signal?' · '+aggregateName(signal):''}. ${h} framtida perioder = ${periodName({resolution:'custom',period_minutes:stepMinutes(c)*h})}. Veckor börjar måndag 00:00 UTC. Fasta intervall; kalendermånader och kalenderår stöds inte ännu.`;
+  $('period-preview').textContent=`Each training and forecast value covers ${periodName(c)}${signal?' · '+aggregateName(signal):''}. ${h} future intervals = ${periodName({resolution:'custom',period_minutes:stepMinutes(c)*h})}. Weeks start Monday at 00:00 UTC. Fixed intervals; calendar months and years are not supported yet.`;
 }
 
 function toast(message) {
@@ -28,11 +29,11 @@ async function api(path, options={}) {
   const body = await response.json();
   if (response.status === 401) {
     if (!$('auth-dialog').open) $('auth-dialog').showModal();
-    throw new Error('Appens åtkomstnyckel behövs');
+    throw new Error('An app access key is required');
   }
   if (!response.ok) {
     const detail = Array.isArray(body.detail) ? body.detail.map(x => x.msg).join(' · ') : body.detail;
-    throw new Error(detail || 'Åtgärden misslyckades');
+    throw new Error(detail || 'The action failed');
   }
   return body;
 }
@@ -54,8 +55,16 @@ async function refresh() {
 }
 
 function renderList() {
-  $('model-count').textContent = models.length;
-  $('model-list').innerHTML = models.map(m => `<button class="model-item ${m.id === selected ? 'selected' : ''}" data-model="${m.id}">${esc(m.config.name)}<small>${m.config.source === 'demo' ? 'SYNTETISK DEMO · ' : ''}${esc(periodName(m.config))} per värde · ${m.config.horizon} perioder${m.status === 'running' ? ' · arbetar' : ''}</small></button>`).join('');
+  $('first-model').innerHTML=models.some(m=>devMode||m.config.source!=='demo')?'New analysis <span>↗</span>':'Create your first analysis <span>↗</span>';
+  const eligible=models.filter(m=>devMode||m.config.source!=='demo');
+  $('model-count').textContent = eligible.length;
+  const query=$('analysis-search').value.trim().toLocaleLowerCase('en-GB'), status=$('analysis-status').value;
+  const filtered=eligible.filter(m=>(!query||m.config.name.toLocaleLowerCase('en-GB').includes(query)||m.id.toLowerCase().includes(query))&&
+    (!status||(status==='trained'?!!m.metrics&&m.status!=='running'&&m.status!=='error':status==='untrained'?!m.metrics&&m.status!=='running'&&m.status!=='error':m.status===status)));
+  const visible=filtered.slice(0,analysisLimit);
+  $('analysis-list-count').textContent=`${filtered.length} of ${eligible.length} analyses · showing ${visible.length}`;
+  $('analysis-more').hidden=filtered.length<=analysisLimit;
+  $('model-list').innerHTML = visible.map(m => `<button class="model-item ${m.id === selected ? 'selected' : ''}" data-model="${m.id}">${esc(m.config.name)}<small>${m.config.source === 'demo' ? 'SYNTHETIC DEMO · ' : ''}${esc(periodName(m.config))} per value · ${m.config.horizon} intervals · ${m.status==='running'?'Running':m.status==='error'?'Error':m.metrics?'Trained':'Needs training'}</small></button>`).join('') || '<p class="fine">No matching analyses.</p>';
   $('model-list').querySelectorAll('[data-model]').forEach(button => button.onclick = async () => {
     selected = button.dataset.model; historyKey = ''; chartMode = 'forecast'; await refresh();
   });
@@ -68,20 +77,20 @@ function renderDetail() {
   $('detail').hidden = !item || (window.flowEditor && window.flowEditor.mode !== 'results');
   if (!item) return;
   const c = item.config, m = item.metrics, f = item.forecast, busy = item.status === 'running';
-  $('model-source').textContent = c.source === 'demo' ? 'SYNTETISK DEMO · INTE VERKLIGA MÄTVÄRDEN' : c.source === 'ha' ? 'HOME ASSISTANT · EGEN MODELLINSTANS' : 'CSV · EGEN MODELLINSTANS';
+  $('model-source').textContent = c.source === 'demo' ? 'SYNTHETIC DEMO · NOT REAL MEASUREMENTS' : c.source === 'ha' ? 'HOME ASSISTANT · INDEPENDENT ANALYSIS' : 'CSV · INDEPENDENT ANALYSIS';
   $('model-name').textContent = c.name;
-  $('model-subtitle').textContent = `${periodName(c)} per värde · ${aggregateName(c.target)} · ${c.horizon} framtida perioder · ${c.inputs.length} ${c.inputs.length===1?'input':'inputs'} · ${c.auto_update ? 'automatisk uppdatering' : 'manuell uppdatering'}`;
+  $('model-subtitle').textContent = `${periodName(c)} per value · ${aggregateName(c.target)} · ${c.horizon} future intervals · ${c.inputs.length} ${c.inputs.length===1?'input':'inputs'} · ${c.auto_update ? 'automatic refresh' : 'manual refresh'}`;
   $('model-error').hidden = !item.error; $('model-error').textContent = item.error || '';
   $('baseline-warning').hidden = !m || m.beats_baseline;
   const validPoints = (f?.points || []).filter(p => new Date(p.end) > new Date());
   const next = validPoints[0];
   $('next-value').textContent = next ? `${fmt(next.value)} ${c.unit}` : '—';
-  $('next-date').textContent = next ? `${date(next.start)} → ${date(next.end)}` : f ? 'Prognosen har passerat. Uppdatera den.' : 'Ingen prognos ännu';
+  $('next-date').textContent = next ? `${date(next.start)} → ${date(next.end)}` : f ? 'This forecast has expired. Refresh it.' : 'No forecast yet';
   $('model-mae').textContent = m ? `${fmt(m.mae, 3)} ${c.unit}` : '—';
   $('baseline-mae').textContent = m ? `${fmt(m.baseline_mae, 3)} ${c.unit}` : '—';
-  $('baseline-name').textContent = m ? (m.baseline === 'senaste_värde' ? 'Samma värde som senaste mätningen' : 'Samma tid förra veckan · annars senaste värdet') : 'Senaste värdet / samma tid förra veckan';
+  $('baseline-name').textContent = m ? (m.baseline === 'senaste_värde' ? 'Same value as the latest measurement' : 'Same time last week, falling back to the latest value') : 'Latest value / same time last week';
   $('sample-count').textContent = fmt(item.data.n, 0);
-  $('sample-range').textContent = item.data.n ? `${date(item.data.first,true)} – ${date(item.data.last,true)}` : 'Inga mätvärden ännu';
+  $('sample-range').textContent = item.data.n ? `${date(item.data.first,true)} – ${date(item.data.last,true)}` : 'No measurements yet';
   $('sync').hidden = c.source !== 'ha'; $('csv-label').hidden = c.source !== 'csv';
   $('publish').hidden = c.source === 'demo';
   for (const id of ['sync','train','forecast','publish']) $(id).disabled = busy;
@@ -89,16 +98,16 @@ function renderDetail() {
   $('forecast').disabled = busy || !m;
   $('publish').disabled = busy || !f;
   $('csv').disabled = busy;
-  $('job-status').innerHTML = busy ? '<span class="spinner"></span>Modellen arbetar…' : item.trained_at ? 'Tränad ' + esc(date(item.trained_at)) : 'Inte tränad ännu';
+  $('job-status').innerHTML = busy ? '<span class="spinner"></span>Analysis running…' : item.trained_at ? 'Trained ' + esc(date(item.trained_at)) : 'Not trained yet';
   const importance = m?.importance || {};
   const row = (label,value) => `<div class="signal-row"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
-  $('signals').innerHTML = `<div class="signal-row"><span>${esc(c.target.key)}</span><span class="tag">MÅL · ${esc(c.unit || 'utan enhet')}</span></div>` + c.inputs.map(s => row(s.key, importance[s.key] != null ? `${fmt(importance[s.key]*100,0)} % av modellens vikt` : s.entity_id || 'CSV-kolumn')).join('') + row('Kalender', c.calendar.map(k => ({hour:'klockslag',weekday:'veckodag',week:'vecka',year_day:'årstid'}[k])).join(', ') || 'Av') + row('Tidigare målvärden',c.use_target_history ? 'Ingår' : 'Ingår inte');
+  $('signals').innerHTML = `<div class="signal-row"><span>${esc(c.target.key)}</span><span class="tag">TARGET · ${esc(c.unit || 'no unit')}</span></div>` + c.inputs.map(s => row(s.key, importance[s.key] != null ? `${fmt(importance[s.key]*100,0)} % feature importance` : s.entity_id || 'CSV column')).join('') + row('Calendar', c.calendar.map(k => ({hour:'hour',weekday:'weekday',week:'week',year_day:'season'}[k])).join(', ') || 'Off') + row('Target history',c.use_target_history ? 'Included' : 'Excluded');
   const qr = (label,value) => `<div class="quality-row"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
-  $('quality').innerHTML = m ? qr('Träningsperioder',fmt(m.training_rows,0)) + qr('Testperioder',fmt(m.test_rows,0)) + qr('Mot jämförelseprognosen',m.improvement_percent == null ? 'Ingen procentsiffra' : `${fmt(m.improvement_percent,1)} % ${m.improvement_percent >= 0 ? 'lägre fel' : '(högre fel)'}`) + qr('Fördröjningar', c.lags.join(', ') + ' perioder') + qr('Historiktest börjar',date(m.test_first_origin)) : '<p class="fine">Kvaliteten visas när modellen har tränats och testats.</p>';
+  $('quality').innerHTML = m ? qr('Training intervals',fmt(m.training_rows,0)) + qr('Validation intervals',fmt(m.test_rows,0)) + qr('Compared with baseline',m.improvement_percent == null ? 'Percentage unavailable' : `${fmt(m.improvement_percent,1)} % ${m.improvement_percent >= 0 ? 'lower error' : '(higher error)'}`) + qr('Lags', c.lags.join(', ') + ' intervals') + qr('Validation starts',date(m.test_first_origin)) : '<p class="fine">Quality metrics appear after training and validation.</p>';
   $('tab-forecast').classList.toggle('active',chartMode === 'forecast'); $('tab-test').classList.toggle('active',chartMode === 'test');
   $('baseline-legend').hidden = chartMode !== 'test';
-  $('chart-description').textContent = chartMode === 'test' ? 'Senare historik som inte användes vid träning · en period framåt' : f ? `Prognos från ${date(f.origin)}. Bandet visar historisk felstorlek.` : 'Hämta historik och träna modellen för att börja.';
-  $('interval-note').textContent = chartMode === 'forecast' && f ? f.interval_note : 'Modellens vikt visar användning i modellen, inte ett bevis på orsakssamband.';
+  $('chart-description').textContent = chartMode === 'test' ? 'Later history excluded from training · one period ahead' : f ? `Forecast from ${date(f.origin)}. The band shows historical error magnitude.` : 'Fetch history and train to get started.';
+  $('interval-note').textContent = chartMode === 'forecast' && f ? 'The band shows the 90th percentile of absolute validation errors; coverage is not guaranteed.' : 'Feature importance shows model usage, not evidence of causation.';
   drawChart(item);
 }
 
@@ -117,7 +126,7 @@ function drawChart(item) {
   }
   const all=[...actual,...predicted,...baseline].filter(p=>Number.isFinite(p[0])&&p[1]!=null&&Number.isFinite(p[1]));
   if (!all.length) {
-    $('chart').innerHTML='<div class="chart-empty">Här visas '+(chartMode==='test'?'historiktestet när modellen har tränats.':'historik och prognos när mätvärden finns.')+'</div>'; return;
+    $('chart').innerHTML='<div class="chart-empty">This chart shows '+(chartMode==='test'?'validation after training.':'history and forecast when data is available.')+'</div>'; return;
   }
   const width=1000,height=315,left=58,right=20,top=20,bottom=43;
   let minX=Math.min(...all.map(p=>p[0])),maxX=Math.max(...all.map(p=>p[0]));
@@ -125,13 +134,13 @@ function drawChart(item) {
   let minY=Math.min(...all.map(p=>p[1]),...band.map(p=>p[1])),maxY=Math.max(...all.map(p=>p[1]),...band.map(p=>p[2]));
   const padding=(maxY-minY)*.12 || 1; minY-=padding; maxY+=padding;
   const x=t=>left+(t-minX)/(maxX-minX)*(width-left-right),y=v=>height-bottom-(v-minY)/(maxY-minY)*(height-top-bottom);
-  let svg=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${chartMode==='test'?'Historiktest med uppmätt värde, modell och jämförelseprognos':'Historik och framtida prognos'}">`;
+  let svg=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${chartMode==='test'?'Validation with observed values, model and baseline':'History and future forecast'}">`;
   for(let i=0;i<=4;i++){
     const value=minY+(maxY-minY)*i/4,yy=y(value);
     svg+=`<line x1="${left}" y1="${yy}" x2="${width-right}" y2="${yy}" stroke="#2c3645" stroke-dasharray="3 5"/><text x="${left-12}" y="${yy+4}" text-anchor="end" fill="#8595a8" font-size="11">${esc(fmt(value,1))}</text>`;
   }
   for(let i=0;i<=4;i++){
-    const t=minX+(maxX-minX)*i/4,label=new Date(t).toLocaleString('sv-SE',stepMinutes(item.config)>=1440?{month:'short',day:'numeric'}:{day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const t=minX+(maxX-minX)*i/4,label=new Date(t).toLocaleString('en-GB',stepMinutes(item.config)>=1440?{month:'short',day:'numeric'}:{day:'numeric',hour:'2-digit',minute:'2-digit'});
     svg+=`<text x="${x(t)}" y="${height-12}" text-anchor="${i===0?'start':i===4?'end':'middle'}" fill="#8595a8" font-size="11">${esc(label)}</text>`;
   }
   if(band.length){
@@ -147,13 +156,13 @@ function drawChart(item) {
     return `<path d="${d}" stroke="${color}" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round" ${dash?'stroke-dasharray="'+dash+'"':''}/>`;
   };
   svg+=path(baseline,'#b399d4','4 5')+path(actual,'#79b8f8')+path(predicted,'#bef36c');
-  if(chartMode==='forecast'&&f){const ox=x(new Date(f.origin).getTime());svg+=`<line x1="${ox}" y1="${top}" x2="${ox}" y2="${height-bottom}" stroke="#6d8260" stroke-dasharray="5 5"/><text x="${Math.min(ox+8,width-95)}" y="${top+10}" fill="#bef36c" font-size="10">Prognosstart</text>`;}
+  if(chartMode==='forecast'&&f){const ox=x(new Date(f.origin).getTime());svg+=`<line x1="${ox}" y1="${top}" x2="${ox}" y2="${height-bottom}" stroke="#6d8260" stroke-dasharray="5 5"/><text x="${Math.min(ox+8,width-95)}" y="${top+10}" fill="#bef36c" font-size="10">Forecast start</text>`;}
   $('chart').innerHTML=svg+'</svg>';
 }
 
 function addInput(signal={key:'',entity_id:'',statistic:'mean'}) {
   const div=document.createElement('div');div.className='input-row';
-  div.innerHTML=`<label>Namn i modellen<input class="input-key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain" value="${esc(signal.key)}"></label><label>HA-sensor<span class="entity-field"><input class="input-entity" placeholder="sensor.rain" value="${esc(signal.entity_id)}"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för input">Sök</button></span></label><label>Värde per period<select class="input-stat"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="change">Mätarökning</option></select></label><button type="button" class="remove-input" aria-label="Ta bort input">×</button>`;
+  div.innerHTML=`<label>Column name<input class="input-key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain" value="${esc(signal.key)}"></label><label>HA sensor<span class="entity-field"><input class="input-entity" placeholder="sensor.rain" value="${esc(signal.entity_id)}"><button type="button" class="secondary" data-entity-picker aria-label="Search HA input signal">Search</button></span></label><label>Value per interval<select class="input-stat"><option value="mean">Mean</option><option value="last">Latest value</option><option value="change">Meter increment</option></select></label><button type="button" class="remove-input" aria-label="Ta bort input">×</button>`;
   div.querySelector('.input-stat').value=signal.statistic;
   div.querySelector('.remove-input').onclick=()=>div.remove();
   $('input-rows').append(div);
@@ -162,7 +171,7 @@ function addInput(signal={key:'',entity_id:'',statistic:'mean'}) {
 function openForm(spec=null) {
   const form=$('model-form');form.reset();$('form-error').hidden=true;$('input-rows').innerHTML='';
   if(spec){
-    const values={...spec,name:spec.name+' · kopia',source:spec.source==='demo'?'csv':spec.source,target_key:spec.target.key,target_entity:spec.target.entity_id||'',target_stat:spec.target.statistic,lags:spec.lags.join(', '),windows:spec.windows.join(', ')};
+    const values={...spec,name:spec.name+' · copy',source:spec.source==='demo'?'csv':spec.source,target_key:spec.target.key,target_entity:spec.target.entity_id||'',target_stat:spec.target.statistic,lags:spec.lags.join(', '),windows:spec.windows.join(', ')};
     for(const [name,value] of Object.entries(values)){
       const field=form.elements.namedItem(name);
       if(!field||name==='calendar')continue;
@@ -176,7 +185,7 @@ function openForm(spec=null) {
 
 async function action(name, modelId=selected) {
   if(!modelId)return;
-  if(window.flowEditor?.modelId===modelId&&window.flowEditor?.dirty){toast('Spara arbetsytan innan du tränar eller gör en prognos.');return;}
+  if(window.flowEditor?.modelId===modelId&&window.flowEditor?.dirty){toast('Save the analysis before training or forecasting.');return;}
   try{await api(`models/${modelId}/actions/${name}`,{method:'POST'});await refresh();}
   catch(error){toast(error.message);}
 }
@@ -198,12 +207,12 @@ $('tab-test').onclick=()=>{chartMode='test';renderDetail();};
 for(const name of ['sync','train','forecast','publish'])$(name).onclick=()=>action(name);
 document.querySelectorAll('[data-demo]').forEach(button=>button.onclick=async()=>{
   button.disabled=true;
-  try{const item=await api('demo/'+button.dataset.demo,{method:'POST'});selected=item.id;historyKey='';await refresh();toast('Demomodellen är skapad. Träna den för att se historiktestet.');}
+  try{const item=await api('demo/'+button.dataset.demo,{method:'POST'});selected=item.id;historyKey='';await refresh();toast('Demo analysis created. Train it to see validation results.');}
   catch(error){toast(error.message);}finally{button.disabled=false;}
 });
 $('model-form').onsubmit=async event=>{
   event.preventDefault();const fd=new FormData(event.target),source=fd.get('source');
-  const offsets=key=>String(fd.get(key)).split(',').map(s=>{if(!/^\s*\d+\s*$/.test(s))throw new Error('Fördröjningar och summeringar ska vara heltal med kommatecken mellan.');return Number(s);});
+  const offsets=key=>String(fd.get(key)).split(',').map(s=>{if(!/^\s*\d+\s*$/.test(s))throw new Error('Lags and windows must be comma-separated integers.');return Number(s);});
   const bound=key=>fd.get(key)===''?null:Number(fd.get(key));
   try{
     const spec={name:fd.get('name'),source,target:{key:fd.get('target_key'),entity_id:source==='ha'?fd.get('target_entity')||null:null,statistic:fd.get('target_stat')},
@@ -211,7 +220,7 @@ $('model-form').onsubmit=async event=>{
       unit:fd.get('unit'),resolution:fd.get('resolution'),period_minutes:Number(fd.get('period_minutes')),horizon:Number(fd.get('horizon')),timezone:fd.get('timezone'),calendar:fd.getAll('calendar'),
       lags:offsets('lags'),windows:offsets('windows'),use_target_history:fd.has('use_target_history'),minimum:bound('minimum'),maximum:bound('maximum'),
       auto_update:source==='ha'&&fd.has('auto_update'),history_days:Number(fd.get('history_days')),retrain_days:Number(fd.get('retrain_days'))};
-    const item=await api('models',{method:'POST',body:JSON.stringify(spec)});selected=item.id;historyKey='';$('model-dialog').close();await refresh();toast('Modellen är skapad. Hämta eller importera historik för att börja.');
+    const item=await api('models',{method:'POST',body:JSON.stringify(spec)});selected=item.id;historyKey='';$('model-dialog').close();await refresh();toast('Analysis created. Fetch or import history to start.');
   }catch(error){$('form-error').textContent=error.message;$('form-error').hidden=false;}
 };
 $('csv').onchange=async event=>{
@@ -219,7 +228,7 @@ $('csv').onchange=async event=>{
   if(window.flowEditor?.modelId===modelId&&window.flowEditor?.dirty){event.target.value='';toast('Spara arbetsytan innan du importerar historik.');return;}
   const form=new FormData();form.append('file',file);
   if($('csv-period').value!=='model')form.append('interval_minutes',$('csv-period').value);
-  try{const result=await api(`models/${modelId}/csv`,{method:'POST',body:form});historyKey='';await refresh();toast(`${result.rows} mätperioder importerade.`);}
+  try{const result=await api(`models/${modelId}/csv`,{method:'POST',body:form});historyKey='';await refresh();toast(`${result.rows} intervals imported.`);}
   catch(error){toast(error.message);}finally{event.target.value='';delete event.target.dataset.modelId;}
 };
 $('csv-label').onclick=()=>{$('csv').dataset.modelId=selected||'';};
@@ -230,10 +239,26 @@ $('auth-form').onsubmit=async event=>{
 };
 async function init(){
   try{
-    const status=await api('status');$('connection').textContent=status.ha_configured?'HA-anslutning konfigurerad':'CSV och demo · HA ej ansluten';$('connection').classList.toggle('connected',status.ha_configured);
+    const status=await api('status');$('connection').textContent=status.ha_configured?'HA connection configured':'Local history · HA not connected';$('connection').classList.toggle('connected',status.ha_configured);
+    devMode=!!status.dev_mode;
+    document.querySelectorAll('[data-dev-only]').forEach(el=>el.hidden=!devMode);
     window.entityPicker?.setConfigured(status.ha_configured);
     if(status.ha_configured) await window.entityPicker?.refresh();
     await refresh();
   }catch(error){if(!$('auth-dialog').open)toast(error.message);}
 }
 init();setInterval(()=>{if(!$('auth-dialog').open)refresh();},3000);
+
+function setSidebarCollapsed(collapsed) {
+  document.body.classList.toggle('sidebar-collapsed',collapsed);
+  const button=$('sidebar-toggle');button.setAttribute('aria-expanded',String(!collapsed));
+  button.setAttribute('aria-label',collapsed?'Expand sidebar':'Collapse sidebar');button.title=collapsed?'Expand sidebar':'Collapse sidebar';
+  try {localStorage.setItem('predictratron-sidebar-collapsed',String(collapsed));} catch (_) {}
+}
+let sidebarCollapsed=true;
+try {sidebarCollapsed=localStorage.getItem('predictratron-sidebar-collapsed')!=='false';} catch (_) {}
+setSidebarCollapsed(sidebarCollapsed);
+$('sidebar-toggle').onclick=()=>setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+$('analysis-search').oninput=()=>{analysisLimit=50;renderList();};
+$('analysis-status').onchange=()=>{analysisLimit=50;renderList();};
+$('analysis-more').onclick=()=>{analysisLimit+=50;renderList();};

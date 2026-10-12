@@ -49,11 +49,11 @@ def test_weekly_hourly_csv_aggregates_mean_sum_last_without_future_data():
 def test_csv_rejects_upsampling_and_misaligned_week_boundaries():
     spec=weekly()
     content=b'timestamp,level,rain,last\n2026-01-08T00:00:00Z,10,2,10\n'
-    with pytest.raises(ValueError,match='gränserna'):
+    with pytest.raises(ValueError,match='boundaries'):
         parse_csv(content,spec)
-    with pytest.raises(ValueError,match='Uppsampling'):
+    with pytest.raises(ValueError,match='Upsampling'):
         parse_csv(content,spec,20160)
-    with pytest.raises(ValueError,match='inga kompletta'):
+    with pytest.raises(ValueError,match='no complete'):
         parse_csv(content,spec,1440)
 
 
@@ -98,7 +98,7 @@ def test_fifteen_minute_ha_requests_five_minute_statistics():
     result=ha.history(spec)
     assert ha.command['period']=='5minute'
     assert result.iloc[-1]['level']==3
-    with pytest.raises(ValidationError,match='fem minuter'):
+    with pytest.raises(ValidationError,match='five minutes'):
         ModelSpec(name='1 min',resolution='minute',target={'key':'rain','entity_id':'sensor.rain','statistic':'change'})
 
 
@@ -120,7 +120,7 @@ def test_custom_interval_change_protects_existing_history(tmp_path):
     from app.graph import Graph
     changed=spec.model_copy(update={'period_minutes':30})
     graph=Graph.model_validate({'nodes':[{'id':'ml','kind':'ml','x':0,'y':0,'config':changed.model_dump()},{'id':'out','kind':'output','x':300,'y':0,'signal':changed.target.model_dump()}],'edges':[{'source':'ml','target':'out'}]})
-    with pytest.raises(ValueError,match='ny modell'):
+    with pytest.raises(ValueError,match='new analysis'):
         store.save_graph(first,graph)
     assert store.spec(first).step_minutes==15
 

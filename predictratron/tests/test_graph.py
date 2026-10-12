@@ -53,7 +53,7 @@ def test_invalid_or_duplicate_connections_rejected(edge):
 def test_output_must_be_connected():
     graph=water_graph()
     graph.edges=[edge for edge in graph.edges if edge.source!="ml"]
-    with pytest.raises(ValueError,match="outputsignal"):
+    with pytest.raises(ValueError,match="output signal"):
         graph.compile()
 
 
@@ -104,7 +104,7 @@ def test_changed_target_or_data_contract_does_not_overwrite_old_history(tmp_path
     spec,frame=demo_data("water")
     store=Store(tmp_path);model_id=store.create(spec);store.add_frame(model_id,frame)
     graph=water_graph(spec);graph.nodes[-1].signal.key="different_level"
-    with pytest.raises(ValueError,match="ny modell"):
+    with pytest.raises(ValueError,match="new analysis"):
         store.save_graph(model_id,graph)
     assert store.get(model_id)["config"]["target"]["key"]=="water_level"
     assert store.get(model_id)["data"]["n"]==len(frame)
@@ -179,7 +179,7 @@ def test_connected_signals_determine_history_source_not_ml_setting():
 def test_mixed_history_sources_rejected_until_all_connected_signals_mapped():
     graph = water_graph()
     graph.nodes[0].signal.entity_id = 'sensor.rain'
-    with pytest.raises(ValueError, match='Blandade datakällor'):
+    with pytest.raises(ValueError, match='Mixed history sources'):
         graph.compile()
     graph.nodes[-1].signal.entity_id = 'sensor.water_level'
     assert graph.compile().source == 'ha'

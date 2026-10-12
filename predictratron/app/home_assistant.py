@@ -93,10 +93,10 @@ class HAClient:
 
     def require(self):
         if not self.configured:
-            raise ValueError("Home Assistant är inte ansluten. Ange HA_URL och HA_TOKEN_FILE eller HA_TOKEN i containern.")
+            raise ValueError("Home Assistant is not connected. Set HA_URL and HA_TOKEN_FILE or HA_TOKEN in the container.")
         parts = urlsplit(self.url)
         if parts.scheme not in {"http", "https"} or not parts.netloc or parts.username or parts.password:
-            raise ValueError("HA_URL måste vara en http(s)-adress utan inbyggda inloggningsuppgifter")
+            raise ValueError("HA_URL must be an HTTP(S) URL without embedded credentials")
 
     def request(self, method, path, **kwargs):
         self.require()
@@ -105,10 +105,10 @@ class HAClient:
             with httpx.Client(timeout=60, verify=verify, headers={"Authorization": f"Bearer {self.token}"}) as client:
                 response = client.request(method, f"{self.url}/api/{path.lstrip('/')}", **kwargs)
             if response.status_code >= 400:
-                raise ValueError(f"Home Assistant svarade med HTTP {response.status_code}")
+                raise ValueError(f"Home Assistant returned HTTP {response.status_code}")
             return response.json()
         except httpx.RequestError as exc:
-            raise ValueError("Kunde inte ansluta till Home Assistant. Kontrollera adress, nätverk och certifikat.") from exc
+            raise ValueError("Cannot connect to Home Assistant. Check the URL, network and certificate.") from exc
 
     def websocket(self, command):
         self.require()
@@ -120,22 +120,22 @@ class HAClient:
             with connect(url, open_timeout=20, max_size=32 * 1024 * 1024, **options) as ws:
                 hello = json.loads(ws.recv(timeout=60))
                 if hello.get("type") != "auth_required":
-                    raise ValueError("Oväntat svar från Home Assistant")
+                    raise ValueError("Unexpected Home Assistant response")
                 ws.send(json.dumps({"type": "auth", "access_token": self.token}))
                 auth = json.loads(ws.recv(timeout=60))
                 if auth.get("type") != "auth_ok":
-                    raise ValueError("Home Assistant nekade API-inloggningen")
+                    raise ValueError("Home Assistant rejected API authentication")
                 ws.send(json.dumps({"id": 1, **command}))
                 while True:
                     response = json.loads(ws.recv(timeout=90))
                     if response.get("id") == 1:
                         if not response.get("success"):
-                            raise ValueError("Home Assistant kunde inte hämta statistiken; kontrollera sensorer och behörighet")
+                            raise ValueError("Cannot fetch HA statistics; check sensors and permissions")
                         return response["result"]
         except ValueError:
             raise
         except Exception as exc:
-            raise ValueError("Statistikanslutningen till Home Assistant misslyckades") from exc
+            raise ValueError("Home Assistant statistics connection failed") from exc
 
     def entities(self):
         result = []
@@ -152,7 +152,7 @@ class HAClient:
         end = spec.floor(pd.Timestamp.now(tz="UTC"))
         start = spec.floor(end - pd.Timedelta(days=spec.history_days))
         if (end - start) / pd.Timedelta(spec.freq) > 200_000:
-            raise ValueError("Vald historik omfattar fler än 200 000 perioder. Korta historiken eller välj en längre tidsperiod.")
+            raise ValueError("Selected history exceeds 200,000 intervals. Shorten history or use longer intervals.")
         base_minutes = 60 if spec.step_minutes % 60 == 0 else 5 if spec.step_minutes % 5 == 0 else None
         data = self.websocket({"type": "recorder/statistics_during_period", "start_time": start.isoformat(),
                                "end_time": end.isoformat(), "statistic_ids": sorted(set(s.entity_id for s in spec.signals)),
@@ -162,7 +162,7 @@ class HAClient:
             if not frame.empty and frame[signal.key].notna().any():
                 continue
             if signal.statistic == "change":
-                raise ValueError(f"{signal.entity_id} saknar förändringsstatistik. Använd en registrerad ackumulerande mätare.")
+                raise ValueError(f"{signal.entity_id} has no increment statistics. Use a registered cumulative meter.")
             # Binary sensors and 'last' on measurement sensors may have no
             # long-term statistics. Their available raw state history is used.
             groups = self.request("GET", "history/period/" + start.isoformat(), params={
@@ -174,7 +174,7 @@ class HAClient:
             frame[signal.key] = raw
         for signal in spec.signals:
             if frame.empty or not frame[signal.key].notna().any():
-                raise ValueError(f"Ingen användbar historik för {signal.entity_id}. Kontrollera statistiktyp och Recorder.")
+                raise ValueError(f"No usable history for {signal.entity_id}. Check statistics type and Recorder.")
         frame = frame.sort_index().dropna(how="all")
         return frame
 

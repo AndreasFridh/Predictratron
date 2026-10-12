@@ -24,7 +24,7 @@ class Service:
         with self.lock:
             self.store.get(model_id)
             if model_id in self.pending:
-                raise ValueError("Den här modellen arbetar redan")
+                raise ValueError("This analysis is already running")
             self.pending.add(model_id)
             self.store.update(model_id, status="running", error=None)
             self.pool.submit(self._work, model_id, action)
@@ -35,7 +35,7 @@ class Service:
             if action in {"sync", "run"} and spec.source == "ha":
                 self.store.add_frame(model_id, self.ha.history(spec))
             elif action == "sync":
-                raise ValueError("Den här modellen använder CSV eller demodata; ingen HA-historik hämtas")
+                raise ValueError("This analysis uses CSV or demo data; HA history cannot be fetched")
             if action in {"train", "run"}:
                 artifact = train(self.store.frame(model_id), spec)
                 save_artifact(self.store.artifact(model_id), artifact)
@@ -43,7 +43,7 @@ class Service:
             if action in {"forecast", "run", "publish"}:
                 path = self.store.artifact(model_id)
                 if not path.exists():
-                    raise ValueError("Träna modellen innan du gör en prognos")
+                    raise ValueError("Train the analysis before forecasting")
                 result = forecast(self.store.frame(model_id), spec, joblib.load(path))
                 if action == "publish":
                     if spec.source == "demo":
@@ -56,7 +56,7 @@ class Service:
         except Exception:
             # Do not echo arbitrary upstream responses or credential-bearing URLs.
             log.error("Operation %s failed for model %s", action, model_id)
-            self.store.update(model_id, status="error", error="Arbetet misslyckades. Kontrollera data och modellinställningar.")
+            self.store.update(model_id, status="error", error="The job failed. Check the data and ML settings.")
         finally:
             with self.lock:
                 self.pending.discard(model_id)

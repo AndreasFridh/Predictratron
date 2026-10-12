@@ -14,7 +14,7 @@ class EntityPicker {
       const input = button.previousElementSibling;
       if (input.disabled) return;
       const signalForm = input.closest('#signal-form');
-      const output = input.name === 'target_entity' || (signalForm && $('signal-role').textContent === 'OUTPUTSIGNAL');
+      const output = input.name === 'target_entity' || (signalForm && $('signal-role').textContent === 'OUTPUT SIGNAL');
       this.open(input.value, entity => {
         input.value = entity.entity_id;
         if (signalForm) {
@@ -29,7 +29,7 @@ class EntityPicker {
   setEntities(entities) {
     this.entities = entities; this.error = ''; this.fetched = new Date();
     window.flowEditor?.setEntities(entities);
-    $('ha-entity-count').textContent = `${entities.length} signaler · sök och välj`;
+    $('ha-entity-count').textContent = `${entities.length} signals · search and select`;
     this.render();
   }
   setConfigured(configured) {this.configured = configured; this.render();}
@@ -51,22 +51,22 @@ class EntityPicker {
     $('entity-more').hidden = true;
     const results = $('entity-results');
     if (!this.configured) {
-      $('entity-count').textContent = 'Home Assistant är inte ansluten.';
-      results.innerHTML = '<p class="entity-empty">Anslut Home Assistant för att söka bland dina signaler. Du kan fortfarande ange ett entity-id i signalinställningarna.</p>'; return;
+      $('entity-count').textContent = 'Home Assistant is not connected.';
+      results.innerHTML = '<p class="entity-empty">Connect Home Assistant to search your signals. You can still enter an entity ID in signal settings.</p>'; return;
     }
     const matches = EntitySearch.filter(this.entities, $('entity-query').value, $('entity-domain').value, $('entity-numeric').checked);
     const shown = matches.slice(0, this.limit);
-    $('entity-count').textContent = this.error ? `Kunde inte uppdatera: ${this.error}` : this.loading ? 'Hämtar senaste värden…' :
-      `${matches.length} av ${this.entities.length} signaler · visar ${shown.length}` + (this.fetched ? ` · hämtat ${this.fetched.toLocaleTimeString('sv-SE')}` : '');
+    $('entity-count').textContent = this.error ? `Could not refresh: ${this.error}` : this.loading ? 'Fetching latest values…' :
+      `${matches.length} of ${this.entities.length} signals · showing ${shown.length}` + (this.fetched ? ` · fetched ${this.fetched.toLocaleTimeString('en-GB')}` : '');
     $('entity-more').hidden = matches.length <= this.limit;
     results.innerHTML = shown.map(entity => {
       const usable = EntitySearch.usable(entity), boolean = EntitySearch.type(entity) === 'bool';
       const disabled = !usable || (boolean && !this.allowBoolean);
-      const reason = !usable ? 'Textvärde · kan inte användas i ML' : boolean && !this.allowBoolean ? 'Boolean kan bara användas som input' : '';
+      const reason = !usable ? 'Text value · cannot be used in ML' : boolean && !this.allowBoolean ? 'Boolean signals can only be inputs' : '';
       const stamp = entity.last_updated ? new Date(entity.last_updated) : null;
-      const updated = stamp && !Number.isNaN(stamp.valueOf()) ? stamp.toLocaleString('sv-SE') : 'Tid saknas';
-      return `<button type="button" class="entity-result" data-entity-id="${esc(entity.entity_id)}" ${disabled?'disabled':''} aria-label="Välj ${esc(entity.name)} (${esc(entity.entity_id)})"><span class="entity-name">○ – ${esc(entity.name)} <small>(${boolean?'Boolean':'Float'})</small></span><strong class="entity-value">${esc(EntitySearch.value(entity))}</strong><code>${esc(entity.entity_id)}</code><span class="entity-updated">Uppdaterad ${esc(updated)}</span>${reason?`<span class="entity-reason">${esc(reason)}</span>`:''}</button>`;
-    }).join('') || `<p class="entity-empty">${this.loading?'Hämtar signaler…':this.error?'Försök uppdatera igen.':'Inga signaler matchar. Prova exempelvis sensor.*temp* eller byt filter.'}</p>`;
+      const updated = stamp && !Number.isNaN(stamp.valueOf()) ? stamp.toLocaleString('en-GB') : 'Time unavailable';
+      return `<button type="button" class="entity-result" data-entity-id="${esc(entity.entity_id)}" ${disabled?'disabled':''} aria-label="Select ${esc(entity.name)} (${esc(entity.entity_id)})"><span class="entity-name">○ – ${esc(entity.name)} <small>(${boolean?'Boolean':'Float'})</small></span><strong class="entity-value">${esc(EntitySearch.value(entity))}</strong><code>${esc(entity.entity_id)}</code><span class="entity-updated">Updated ${esc(updated)}</span>${reason?`<span class="entity-reason">${esc(reason)}</span>`:''}</button>`;
+    }).join('') || `<p class="entity-empty">${this.loading?'Fetching signals…':this.error?'Try refreshing again.':'No matching signals. Try sensor.*temp* or change the filter.'}</p>`;
     results.querySelectorAll('[data-entity-id]').forEach(button => {
       button.onclick = () => {
         const entity = this.entities.find(item => item.entity_id === button.dataset.entityId);

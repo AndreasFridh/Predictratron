@@ -19,6 +19,12 @@ minutes. No separate Home Assistant URL or token is needed: the app uses its own
 Supervisor-issued credential. No network port is published; access is through
 Home Assistant Ingress.
 
+## Analysis flows
+
+The English interface uses a compact collapsible sidebar with analysis search
+and status filters. Save each workspace with **Save analysis**. Demo examples
+are available only in development builds (`APP_BUILD=development`).
+
 ## What it does
 
 - Search HA signals by name/entity-id with `*` and `?` wildcards, type filters and latest values.

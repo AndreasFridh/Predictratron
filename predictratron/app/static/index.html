@@ -1,161 +1,170 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Predictratron · Home Assistant</title>
-  <link rel="stylesheet" href="static/style.css">
-  <script defer src="static/app.js"></script>
-  <script defer src="static/entity-search.js"></script>
-  <script defer src="static/entity-picker.js"></script>
-  <script defer src="static/flow.js"></script>
-  <link rel="stylesheet" href="static/flow.css">
+  <link rel="stylesheet" href="static/style.css?v=0.4.0">
+  <script defer src="static/app.js?v=0.4.0"></script>
+  <script defer src="static/entity-search.js?v=0.4.0"></script>
+  <script defer src="static/entity-picker.js?v=0.4.0"></script>
+  <script defer src="static/flow.js?v=0.4.0"></script>
+  <link rel="stylesheet" href="static/flow.css?v=0.4.0">
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="brand"><span class="brand-mark">↗</span><div>Predictratron<small>Din lokala modellverkstad</small></div></div>
-    <div class="sidebar-heading">MODELLER <span id="model-count">0</span></div>
-    <nav id="model-list" aria-label="Modeller"></nav>
-    <button class="new-model" id="new-model">＋ Ny modell</button>
-    <button class="new-model" id="show-examples">Prova demoexempel</button>
-    <div class="sidebar-bottom"><span class="dot"></span> Lokal bearbetning <small>Historik och modeller sparas i din app.</small></div>
+  <aside class="sidebar" aria-label="Analysis navigation">
+    <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-controls="analysis-navigation" aria-expanded="true" aria-label="Collapse sidebar">☰</button>
+    <div class="brand"><span class="brand-mark">↗</span><div>Predictratron<small>Your local analysis workspace</small></div></div>
+    <div id="analysis-navigation" class="analysis-navigation">
+    <div class="sidebar-heading">ANALYSIS FLOWS <span id="model-count">0</span></div>
+    <label class="analysis-search-label">Search analyses<input type="search" id="analysis-search" placeholder="Name or analysis ID" autocomplete="off"></label>
+    <label class="analysis-status-label">Status<select id="analysis-status"><option value="">All analyses</option><option value="running">Running</option><option value="trained">Trained</option><option value="untrained">Needs training</option><option value="error">Error</option></select></label>
+    <p class="fine" id="analysis-list-count" role="status"></p>
+    <nav id="model-list" aria-label="Analysis flows"></nav>
+    <button class="secondary" id="analysis-more" hidden>Show 50 more</button>
+    </div>
+    <button class="new-model" id="new-model" aria-label="New analysis" title="New analysis"><span>＋</span><span class="new-analysis-label">New analysis</span></button>
+    <button class="new-model" id="show-examples" data-dev-only hidden>Demo examples</button>
+    <div class="sidebar-bottom"><span class="dot"></span> Local processing <small>History and trained models stay in your app.</small></div>
   </aside>
   <main>
-    <header class="topbar"><span>HOME ASSISTANT / PREDIKTION</span><div id="connection" class="connection">Kontrollerar anslutning…</div></header>
+    <header class="topbar"><span>HOME ASSISTANT / PREDICTION</span><div id="connection" class="connection">Checking connection…</div></header>
     <section id="workbench" hidden>
-      <div class="flow-heading"><div><div class="eyebrow">SIGNALER → ML → PROGNOS</div><h1 id="flow-title">Ny modell</h1></div><div class="tabs"><button id="view-flow" class="active">Arbetsyta</button><button id="view-results">Resultat</button></div></div>
+      <div class="flow-heading"><div><div class="eyebrow">SIGNALS → ML → FORECAST</div><h1 id="flow-title">New analysis</h1></div><div class="tabs"><button id="view-flow" class="active">Canvas</button><button id="view-results">Results</button></div></div>
       <div id="flow-area">
-        <div class="flow-toolbar"><button class="secondary" id="palette-toggle">＋ Signaler</button><button class="secondary" id="ml-settings">ML-inställningar</button><button class="primary" id="save-flow">Spara modell</button><button class="secondary" id="save-copy">Spara som ny modell</button><span id="flow-save-status" role="status">Sparad</span></div>
+        <div class="flow-toolbar"><button class="secondary" id="palette-toggle">＋ Signals</button><button class="secondary" id="ml-settings">ML settings</button><button class="primary" id="save-flow">Save analysis</button><button class="secondary" id="save-copy">Save as new analysis</button><span id="flow-save-status" role="status">Saved</span></div>
         <div class="flow-layout">
           <aside id="signal-palette" class="signal-palette">
-            <div class="palette-title">SIGNALER <span>Dra till arbetsytan</span></div>
+            <div class="palette-title">SIGNALS <span>Drag onto the canvas</span></div>
             <div class="palette-group-title">INPUTS</div>
-            <button class="palette-signal" draggable="true" data-template="rain" aria-label="Lägg till Nederbörd (Float)">○ – Nederbörd <span>(Float)</span></button>
-            <button class="palette-signal" draggable="true" data-template="temperature" aria-label="Lägg till Temperatur (Float)">○ – Temperatur <span>(Float)</span></button>
-            <button class="palette-signal" draggable="true" data-template="custom" aria-label="Lägg till egen inputsignal">○ – Egen signal <span>(Float)</span></button>
-            <div class="palette-group-title">KALENDER</div>
-            <button class="palette-signal calendar-palette" draggable="true" data-template="week" aria-label="Lägg till Vecka (Integer)">○ – Vecka <span>(Integer)</span></button>
-            <button class="palette-signal calendar-palette" draggable="true" data-template="weekday" aria-label="Lägg till Veckodag (Integer)">○ – Veckodag <span>(Integer)</span></button>
-            <button class="palette-signal calendar-palette" draggable="true" data-template="hour" aria-label="Lägg till Klockslag (Integer)">○ – Klockslag <span>(Integer)</span></button>
-            <button class="palette-signal calendar-palette" draggable="true" data-template="year_day" aria-label="Lägg till Årstid (Integer)">○ – Årstid <span>(Integer)</span></button>
+            <button class="palette-signal" draggable="true" data-template="rain" aria-label="Add Rainfall (Float)">○ – Rainfall <span>(Float)</span></button>
+            <button class="palette-signal" draggable="true" data-template="temperature" aria-label="Add Temperature (Float)">○ – Temperature <span>(Float)</span></button>
+            <button class="palette-signal" draggable="true" data-template="custom" aria-label="Add custom input signal">○ – Custom signal <span>(Float)</span></button>
+            <div class="palette-group-title">CALENDAR</div>
+            <button class="palette-signal calendar-palette" draggable="true" data-template="week" aria-label="Add Week (Integer)">○ – Week <span>(Integer)</span></button>
+            <button class="palette-signal calendar-palette" draggable="true" data-template="weekday" aria-label="Add Weekday (Integer)">○ – Weekday <span>(Integer)</span></button>
+            <button class="palette-signal calendar-palette" draggable="true" data-template="hour" aria-label="Add Hour (Integer)">○ – Hour <span>(Integer)</span></button>
+            <button class="palette-signal calendar-palette" draggable="true" data-template="year_day" aria-label="Add Season (Integer)">○ – Season <span>(Integer)</span></button>
             <div class="palette-group-title">OUTPUT</div>
-            <button class="palette-signal output-palette" draggable="true" data-template="output" aria-label="Lägg till outputsignal">○ – Outputsignal <span>(Float)</span></button>
-            <div class="palette-group-title">HOME ASSISTANT</div><div id="ha-palette"><button type="button" id="browse-ha-signals" class="secondary">⌕ Sök HA-signaler</button><p class="fine" id="ha-entity-count">Anslut HA för att välja dina sensorer.</p></div>
-            <p class="fine">Klick fungerar också. Varje modellinstans har en egen ML-box.</p>
+            <button class="palette-signal output-palette" draggable="true" data-template="output" aria-label="Add output signal">○ – Output signal <span>(Float)</span></button>
+            <div class="palette-group-title">HOME ASSISTANT</div><div id="ha-palette"><button type="button" id="browse-ha-signals" class="secondary">⌕ Search HA signals</button><p class="fine" id="ha-entity-count">Connect HA to select your sensors.</p></div>
+            <p class="fine">You can also click. Each analysis has its own ML box.</p>
           </aside>
           <div class="canvas-shell">
-            <div id="flow-canvas" class="flow-canvas" tabindex="0" aria-label="Arbetsyta med flyttbara signaler och ML-box">
-              <div id="flow-world" class="flow-world"><svg id="flow-wires" aria-label="Signalkopplingar"></svg><div id="flow-nodes"></div></div>
+            <div id="flow-canvas" class="flow-canvas" tabindex="0" aria-label="Canvas with movable signals and ML box">
+              <div id="flow-world" class="flow-world"><svg id="flow-wires" aria-label="Signal connections"></svg><div id="flow-nodes"></div></div>
             </div>
-            <div class="canvas-controls"><button id="zoom-out" aria-label="Zooma ut">−</button><span id="zoom-label">100 %</span><button id="zoom-in" aria-label="Zooma in">＋</button><button id="fit-flow">Visa hela flödet</button></div>
+            <div class="canvas-controls"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">100 %</span><button id="zoom-in" aria-label="Zoom in">＋</button><button id="fit-flow">Fit flow</button></div>
           </div>
         </div>
-        <div class="flow-footer"><span id="flow-help">Dra från en signals ○ till ML-boxens ○. Koppla sedan ML till output.</span><span id="flow-validity"></span></div>
+        <div class="flow-footer"><span id="flow-help">Drag from a signal port to the ML box, then connect ML to output.</span><span id="flow-validity"></span></div>
         <div id="flow-error" class="alert" hidden></div>
-        <div class="flow-run-actions"><button class="secondary" id="flow-sync">Hämta historik</button><label id="csv-period-label">CSV-radernas tidsperiod<select id="csv-period"><option value="model">Samma som ML-boxen</option><option value="1">1 minut</option><option value="5">5 minuter</option><option value="15">15 minuter</option><option value="30">30 minuter</option><option value="60">1 timme</option><option value="1440">1 dygn</option><option value="10080">1 vecka</option></select></label><button class="secondary" id="flow-import">Importera historik · CSV</button><span id="flow-job-status" role="status"></span></div>
+        <div class="flow-run-actions"><button class="secondary" id="flow-sync">Fetch history</button><label id="csv-period-label">CSV row interval<select id="csv-period"><option value="model">Same as ML box</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option><option value="10080">1 week</option></select></label><button class="secondary" id="flow-import">Import history · CSV</button><span id="flow-job-status" role="status"></span></div>
       </div>
     </section>
     <section id="welcome" class="welcome">
-      <div class="eyebrow">FRÅN MÄTVÄRDEN TILL FRAMTID</div>
-      <h1>Vad vill du<br>kunna förutse?</h1>
-      <p>Välj dina inputs och ett värde att förutsäga.<br>Varje modell lär sig av sin egen historik.</p>
-      <button class="primary" id="first-model">Skapa din första modell <span>↗</span></button>
-      <div class="demo-title">PROVA MED SYNTETISK HISTORIK</div>
+      <div class="eyebrow">FROM MEASUREMENTS TO FORECASTS</div>
+      <h1>What would you like<br>to predict?</h1>
+      <p>Choose input signals and a value to predict.<br>Each analysis learns from its own history.</p>
+      <button class="primary" id="first-model">Create your first analysis <span>↗</span></button>
+      <div data-dev-only hidden>
+      <div class="demo-title">EXPLORE SYNTHETIC HISTORY</div>
       <div class="demo-grid">
-        <button class="demo-card" data-demo="energy"><span class="demo-icon">ϟ</span><h3>Elförbrukning</h3><p>Temperatur + kalender → kWh per timme</p><span>Öppna demo ↗</span></button>
-        <button class="demo-card" data-demo="water"><span class="demo-icon water">≈</span><h3>Markvattennivå</h3><p>Nederbörd + vecka → vattennivå i cm</p><span>Öppna demo ↗</span></button>
+        <button class="demo-card" data-demo="energy"><span class="demo-icon">ϟ</span><h3>Electricity consumption</h3><p>Temperaturee + calendar → hourly kWh</p><span>Open demo ↗</span></button>
+        <button class="demo-card" data-demo="water"><span class="demo-icon water">≈</span><h3>Soil water level</h3><p>Rainfall + week → water level in cm</p><span>Open demo ↗</span></button>
       </div>
-      <p class="fine">Demodata är påhittade. De visar arbetsflödet och säger inget om precisionen i ditt hem.</p>
+      <p class="fine">Synthetic data demonstrates the workflow and does not indicate accuracy in your home.</p>
+      </div>
     </section>
     <section id="detail" hidden>
-      <div class="detail-heading"><div><div id="model-source" class="eyebrow"></div><h1 id="model-name"></h1><p id="model-subtitle"></p></div><button class="secondary" id="clone">Kopiera inställningar</button></div>
+      <div class="detail-heading"><div><div id="model-source" class="eyebrow"></div><h1 id="model-name"></h1><p id="model-subtitle"></p></div><button class="secondary" id="clone">Duplicate analysis</button></div>
       <div id="model-error" class="alert" hidden></div>
-      <div id="baseline-warning" class="notice" hidden>Modellen slog inte jämförelseprognosen i senaste testet. Prognosen finns att utforska, men behöver förbättras.</div>
+      <div id="baseline-warning" class="notice" hidden>The model did not beat the baseline in the latest test. You can explore the forecast, but it needs improvement.</div>
       <div class="stats-grid">
-        <div class="stat"><span>NÄSTA PERIOD</span><strong id="next-value">—</strong><small id="next-date">Ingen prognos ännu</small></div>
-        <div class="stat"><span>PROGNOSFEL · MAE</span><strong id="model-mae">—</strong><small>Genomsnittligt absolut fel i historiktestet</small></div>
-        <div class="stat"><span>JÄMFÖRELSEPROGNOS · MAE</span><strong id="baseline-mae">—</strong><small id="baseline-name">Senaste värdet / samma tid förra veckan</small></div>
-        <div class="stat"><span>SPARAD HISTORIK</span><strong id="sample-count">—</strong><small id="sample-range">Inga mätvärden ännu</small></div>
+        <div class="stat"><span>NEXT INTERVAL</span><strong id="next-value">—</strong><small id="next-date">No forecast yet</small></div>
+        <div class="stat"><span>FORECAST ERROR · MAE</span><strong id="model-mae">—</strong><small>Mean absolute error in validation</small></div>
+        <div class="stat"><span>BASELINE ERROR · MAE</span><strong id="baseline-mae">—</strong><small id="baseline-name">Latest value / same time last week</small></div>
+        <div class="stat"><span>SAVED HISTORY</span><strong id="sample-count">—</strong><small id="sample-range">No measurements yet</small></div>
       </div>
       <div class="panel chart-panel">
-        <div class="panel-heading"><div><h2>Prognos och verklighet</h2><p id="chart-description">Hämta historik och träna modellen för att börja.</p></div><div class="tabs"><button class="active" id="tab-forecast">Prognos</button><button id="tab-test">Historiktest</button></div></div>
-        <div id="chart" class="chart"><div class="chart-empty">Här visas prognosen när modellen är tränad.</div></div>
-        <div class="legend"><span><i class="legend-dot actual"></i>Uppmätt</span><span><i class="legend-dot predicted"></i>Modell</span><span id="baseline-legend"><i class="legend-dot baseline"></i>Jämförelse</span></div>
+        <div class="panel-heading"><div><h2>Forecast and actual values</h2><p id="chart-description">Fetch history and train to get started.</p></div><div class="tabs"><button class="active" id="tab-forecast">Forecast</button><button id="tab-test">Validation</button></div></div>
+        <div id="chart" class="chart"><div class="chart-empty">The forecast appears after training.</div></div>
+        <div class="legend"><span><i class="legend-dot actual"></i>Observed</span><span><i class="legend-dot predicted"></i>Model</span><span id="baseline-legend"><i class="legend-dot baseline"></i>Baseline</span></div>
         <p id="interval-note" class="fine"></p>
       </div>
       <div class="actionbar">
-        <button class="secondary" id="sync">Hämta HA-historik</button>
-        <label class="secondary file-button" id="csv-label">Importera CSV<input type="file" id="csv" accept=".csv,text/csv" hidden></label>
-        <button class="secondary" id="train">Träna modell</button>
-        <button class="primary" id="forecast">Gör prognos ↗</button>
-        <button class="secondary" id="publish">Publicera i HA</button>
+        <button class="secondary" id="sync">Fetch HA history</button>
+        <label class="secondary file-button" id="csv-label">Import CSV<input type="file" id="csv" accept=".csv,text/csv" hidden></label>
+        <button class="secondary" id="train">Train model</button>
+        <button class="primary" id="forecast">Forecast ↗</button>
+        <button class="secondary" id="publish">Publish to HA</button>
         <span id="job-status" role="status"></span>
       </div>
       <div class="bottom-grid">
-        <div class="panel"><h2>Vad modellen använder</h2><div id="signals"></div><p class="fine">Inputs använder observerad historik. Kalenderfält räknas fram automatiskt.</p></div>
-        <div class="panel"><h2>Träning och kvalitet</h2><div id="quality"></div><p class="fine">Modellen testas på senare data. Framtida målvärden används inte som inputs.</p></div>
+        <div class="panel"><h2>Model features</h2><div id="signals"></div><p class="fine">Inputs use observed history. Calendar features are calculated automatically.</p></div>
+        <div class="panel"><h2>Training and quality</h2><div id="quality"></div><p class="fine">Validation uses later data. Future target values are never used as inputs.</p></div>
       </div>
     </section>
   </main>
   <dialog id="model-dialog">
     <form id="model-form">
-      <div class="dialog-heading"><div><div class="eyebrow">EN EGEN MODELLINSTANS</div><h2>Vad ska modellen lära sig?</h2></div><button type="button" class="close" id="close-dialog" aria-label="Stäng">×</button></div>
+      <div class="dialog-heading"><div><div class="eyebrow">INDEPENDENT ANALYSIS</div><h2>What should this analysis learn?</h2></div><button type="button" class="close" id="close-dialog" aria-label="Close">×</button></div>
       <div class="form-grid">
-        <label>Modellnamn<input name="name" required maxlength="100" placeholder="Till exempel markvattennivå"></label>
-        <label id="model-source-field">Datakälla<select name="source"><option value="ha">Home Assistant</option><option value="csv">CSV-fil</option></select></label>
+        <label>Analysis name<input name="name" required maxlength="100" placeholder="For example, soil water level"></label>
+        <label id="model-source-field">History source<select name="source"><option value="ha">Home Assistant</option><option value="csv">CSV file</option></select></label>
       </div>
-      <div class="form-section"><h3 id="target-section-title">Målet · det vi vill förutsäga</h3><div class="form-grid three" id="signal-target-fields">
-        <label>Namn i modellen<input name="target_key" required pattern="[a-z][a-z0-9_]{0,39}" value="water_level"></label>
-        <label>HA-sensor<span class="entity-field"><input name="target_entity" placeholder="sensor.water_level"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för output">Sök</button></span></label>
-        <label>Värde per period<select name="target_stat"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="change">Mätarökning under perioden</option></select></label>
+      <div class="form-section"><h3 id="target-section-title">Target · what to predict</h3><div class="form-grid three" id="signal-target-fields">
+        <label>Column name<input name="target_key" required pattern="[a-z][a-z0-9_]{0,39}" value="water_level"></label>
+        <label>HA sensor<span class="entity-field"><input name="target_entity" placeholder="sensor.water_level"><button type="button" class="secondary" data-entity-picker aria-label="Search HA output signal">Search</button></span></label>
+        <label>Value per interval<select name="target_stat"><option value="mean">Mean</option><option value="last">Latest value</option><option value="change">Meter increment during interval</option></select></label>
       </div><div class="form-grid three">
-        <label>Enhet<input name="unit" placeholder="cm, %, kWh…" maxlength="20"></label>
-        <label>Tidsperiod för träning och prediktion<select name="resolution"><option value="minute">En minut</option><option value="hour">En timme</option><option value="day">Ett dygn · 24 timmar UTC</option><option value="week">En vecka · 7 dygn UTC</option><option value="custom">Eget fast intervall</option></select></label>
-        <label id="custom-period-field" hidden>Minuter per period<input name="period_minutes" type="number" min="1" max="525600" value="60" required></label>
-        <label>Antal framtida perioder<input name="horizon" type="number" min="1" max="72" value="24" required></label>
+        <label>Unit<input name="unit" placeholder="cm, %, kWh…" maxlength="20"></label>
+        <label>Training and prediction interval<select name="resolution"><option value="minute">One minute</option><option value="hour">One hour</option><option value="day">One day · 24 UTC hours</option><option value="week">One week · 7 UTC days</option><option value="custom">Custom fixed interval</option></select></label>
+        <label id="custom-period-field" hidden>Minutes per interval<input name="period_minutes" type="number" min="1" max="525600" value="60" required></label>
+        <label>Future intervals<input name="horizon" type="number" min="1" max="72" value="24" required></label>
       </div></div>
-      <div class="form-section" id="legacy-input-fields"><div class="form-section-heading"><h3>Inputs · vad påverkar målet?</h3><button type="button" class="small-button" id="add-input">＋ Lägg till input</button></div><div id="input-rows"></div></div>
-      <div class="form-section"><h3>Kalender och minne</h3><div class="checks">
-        <label><input type="checkbox" name="calendar" value="hour" checked> Klockslag</label>
-        <label><input type="checkbox" name="calendar" value="weekday" checked> Veckodag</label>
-        <label><input type="checkbox" name="calendar" value="week" checked> Vecka</label>
-        <label><input type="checkbox" name="calendar" value="year_day" checked> Årstid</label>
-      </div><label class="check-line"><input type="checkbox" name="use_target_history" checked> Använd också tidigare målvärden</label>
-      <p class="fine" id="period-preview">Träning och prognos använder samma tidsperiod.</p>
-      <div class="form-grid"><label>Fördröjningar · antal perioder<input name="lags" value="0, 1, 24, 168" required></label><label>Summeringar och medelvärden · antal perioder<input name="windows" value="24, 72, 168" required></label></div>
-      <p class="fine">0 betyder senaste avslutade perioden. För en dygnsmodell kan du börja med fördröjningar 0, 1, 2, 7, 14 och summeringar 3, 7, 14.</p></div>
-      <details><summary>Fler inställningar</summary><div class="form-grid three">
-        <label>Tidszon för kalender<input name="timezone" value="Europe/Stockholm" required></label>
-        <label>Historik · dagar<input name="history_days" type="number" min="7" max="3650" value="180"></label>
-        <label>Träna om efter · dagar<input name="retrain_days" type="number" min="1" max="90" value="7"></label>
-        <label>Minsta möjliga målvärde<input name="minimum" type="number" step="any" placeholder="Valfritt"></label>
-        <label>Största möjliga målvärde<input name="maximum" type="number" step="any" placeholder="Valfritt"></label>
-      </div><label class="check-line"><input type="checkbox" name="auto_update"> Hämta historik och uppdatera prognosen automatiskt</label><p class="fine">Kontrolleras var 15:e minut när appen körs. Gäller Home Assistant som datakälla.</p></details>
+      <div class="form-section" id="legacy-input-fields"><div class="form-section-heading"><h3>Inputs · what affects the target?</h3><button type="button" class="small-button" id="add-input">＋ Add input</button></div><div id="input-rows"></div></div>
+      <div class="form-section"><h3>Calendar and memory</h3><div class="checks">
+        <label><input type="checkbox" name="calendar" value="hour" checked> Hour</label>
+        <label><input type="checkbox" name="calendar" value="weekday" checked> Weekday</label>
+        <label><input type="checkbox" name="calendar" value="week" checked> Week</label>
+        <label><input type="checkbox" name="calendar" value="year_day" checked> Season</label>
+      </div><label class="check-line"><input type="checkbox" name="use_target_history" checked> Include target history</label>
+      <p class="fine" id="period-preview">Training and prediction use the same interval.</p>
+      <div class="form-grid"><label>Lags · number of intervals<input name="lags" value="0, 1, 24, 168" required></label><label>Rolling windows · number of intervals<input name="windows" value="24, 72, 168" required></label></div>
+      <p class="fine">0 means the latest completed period. For daily data, start with lags 0, 1, 2, 7, 14 and rolling windows 3, 7, 14.</p></div>
+      <details><summary>More settings</summary><div class="form-grid three">
+        <label>Calendar time zone<input name="timezone" value="Europe/Stockholm" required></label>
+        <label>History · days<input name="history_days" type="number" min="7" max="3650" value="180"></label>
+        <label>Retrain after · days<input name="retrain_days" type="number" min="1" max="90" value="7"></label>
+        <label>Minimum target value<input name="minimum" type="number" step="any" placeholder="Optional"></label>
+        <label>Maximum target value<input name="maximum" type="number" step="any" placeholder="Optional"></label>
+      </div><label class="check-line"><input type="checkbox" name="auto_update"> Fetch history and refresh forecasts automatically</label><p class="fine">Checked every 15 minutes while the app runs. Available for Home Assistant signals.</p></details>
       <div id="form-error" class="alert" hidden></div>
-      <div class="dialog-footer"><span>En modell kan användas för valfritt numeriskt mål.</span><button type="submit" class="primary">Skapa modell ↗</button></div>
+      <div class="dialog-footer"><span>An analysis can predict any numeric target.</span><button type="submit" class="primary">Create analysis ↗</button></div>
     </form>
   </dialog>
 
   <dialog id="entity-picker" aria-labelledby="entity-picker-title">
-    <div class="dialog-heading"><div><div class="eyebrow">HOME ASSISTANT / SIGNALER</div><h2 id="entity-picker-title">Hitta din signal</h2></div><button type="button" class="close" id="close-entity-picker" aria-label="Stäng signalsökning">×</button></div>
-    <label>Sök namn eller entity-id<input type="search" id="entity-query" maxlength="256" placeholder="sensor.*temp*" aria-describedby="entity-search-help" autocomplete="off"></label>
-    <p class="fine" id="entity-search-help">Vanlig text söker del av namn eller id. Wildcard matchar hela namnet eller id:t: * = valfria tecken, ? = ett tecken. Exempel: sensor.*temp* eller *kök*.</p>
-    <div class="entity-filters"><label>Signaltyp<select id="entity-domain"><option value="">Alla typer</option><option value="sensor">Sensorer</option><option value="binary_sensor">Binära sensorer</option><option value="input_number">Numeriska hjälpare</option></select></label><label class="check-line"><input id="entity-numeric" type="checkbox">Bara användbara ML-signaler</label><button type="button" class="secondary" id="refresh-entities">Uppdatera värden</button></div>
+    <div class="dialog-heading"><div><div class="eyebrow">HOME ASSISTANT / SIGNALS</div><h2 id="entity-picker-title">Find your signal</h2></div><button type="button" class="close" id="close-entity-picker" aria-label="Close signal search">×</button></div>
+    <label>Search name or entity ID<input type="search" id="entity-query" maxlength="256" placeholder="sensor.*temp*" aria-describedby="entity-search-help" autocomplete="off"></label>
+    <p class="fine" id="entity-search-help">Text searches part of a name or ID. Wildcards match the entire name or ID: * = any characters, ? = one character. Try sensor.*temp* or *kitchen*.</p>
+    <div class="entity-filters"><label>Signal type<select id="entity-domain"><option value="">All types</option><option value="sensor">Sensors</option><option value="binary_sensor">Binary sensors</option><option value="input_number">Numeric helpers</option></select></label><label class="check-line"><input id="entity-numeric" type="checkbox">Usable ML signals only</label><button type="button" class="secondary" id="refresh-entities">Refresh values</button></div>
     <p id="entity-count" class="fine" role="status" aria-live="polite"></p>
     <div id="entity-results" class="entity-results" aria-label="HA-signaler"></div>
-    <button type="button" class="secondary" id="entity-more" hidden>Visa 50 till</button>
-    <p class="fine">Värden är en ögonblicksbild från HA. Klicka en signal för att välja den. Okända värden visas även när historik kan finnas.</p>
+    <button type="button" class="secondary" id="entity-more" hidden>Show 50 more</button>
+    <p class="fine">Values are a snapshot from HA. Select a signal to use it. Unknown values may still have history.</p>
   </dialog>
   <dialog id="signal-dialog"><form id="signal-form">
-    <div class="dialog-heading"><div><div class="eyebrow" id="signal-role">INPUTSIGNAL</div><h2>Signalens inställningar</h2></div><button type="button" class="close" id="close-signal" aria-label="Stäng signalinställningar">×</button></div>
-    <div class="form-grid"><label>Signalnamn<input name="label" required maxlength="80" placeholder="Nederbörd"></label><label>Datatyp<select name="data_type"><option value="float">Float · decimaltal</option><option value="int">Integer · heltal</option><option value="bool">Boolean · 0 / 1</option></select></label></div>
-    <div class="form-grid"><label>Kolumnnamn<input name="key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain"></label><label>HA-sensor<span class="entity-field"><input name="entity_id" placeholder="sensor.rain"><button type="button" class="secondary" data-entity-picker aria-label="Sök HA-signal för denna signal">Sök</button></span></label></div>
-    <label class="statistic-field">Värde per period<select name="statistic"><option value="mean">Medelvärde</option><option value="last">Senaste värde</option><option value="sum">Summa · periodvärden i CSV</option><option value="change">Mätarökning under perioden</option></select></label>
-    <p id="signal-note" class="fine">Välj signalens datakälla. Kopplingen till ML-boxen gör du på arbetsytan.</p>
+    <div class="dialog-heading"><div><div class="eyebrow" id="signal-role">INPUT SIGNAL</div><h2>Signal settings</h2></div><button type="button" class="close" id="close-signal" aria-label="Close signal settings">×</button></div>
+    <div class="form-grid"><label>Signal name<input name="label" required maxlength="80" placeholder="Rainfall"></label><label>Data type<select name="data_type"><option value="float">Float · decimal</option><option value="int">Integer · whole number</option><option value="bool">Boolean · 0 / 1</option></select></label></div>
+    <div class="form-grid"><label>Column name<input name="key" required pattern="[a-z][a-z0-9_]{0,39}" placeholder="rain"></label><label>HA sensor<span class="entity-field"><input name="entity_id" placeholder="sensor.rain"><button type="button" class="secondary" data-entity-picker aria-label="Search HA source for this signal">Search</button></span></label></div>
+    <label class="statistic-field">Value per interval<select name="statistic"><option value="mean">Mean</option><option value="last">Latest value</option><option value="sum">Sum · CSV interval values</option><option value="change">Meter increment during interval</option></select></label>
+    <p id="signal-note" class="fine">Choose the signal mapping, then connect it on the canvas.</p>
     <div id="signal-error" class="alert" hidden></div>
-    <div class="dialog-footer"><button type="button" class="secondary" id="remove-node">Ta bort från arbetsytan</button><button type="submit" class="primary">Använd signal</button></div>
+    <div class="dialog-footer"><button type="button" class="secondary" id="remove-node">Remove from canvas</button><button type="submit" class="primary">Apply signal</button></div>
   </form></dialog>
   <div id="toast" role="status" hidden></div>
-  <dialog id="auth-dialog"><form id="auth-form"><h2>Appens åtkomstnyckel</h2><p>Ange APP_TOKEN för den här appen.</p><input id="app-token" type="password" required autocomplete="off"><button class="primary" type="submit">Öppna appen</button><p id="auth-error" class="fine"></p></form></dialog>
+  <dialog id="auth-dialog"><form id="auth-form"><h2>App access key</h2><p>Enter APP_TOKEN for this app.</p><input id="app-token" type="password" required autocomplete="off"><button class="primary" type="submit">Open app</button><p id="auth-error" class="fine"></p></form></dialog>
 </body>
 </html>

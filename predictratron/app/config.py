@@ -46,7 +46,7 @@ class ModelSpec(BaseModel):
         try:
             ZoneInfo(value)
         except ZoneInfoNotFoundError as exc:
-            raise ValueError("Okänd tidszon") from exc
+            raise ValueError("Unknown time zone") from exc
         return value
 
     @field_validator("lags", "windows")
@@ -54,30 +54,30 @@ class ModelSpec(BaseModel):
     def valid_offsets(cls, values, info):
         lower = 0 if info.field_name == "lags" else 1
         if not values or any(v < lower or v > 8760 for v in values):
-            raise ValueError(f"Ange minst ett värde mellan {lower} och 8760")
+            raise ValueError(f"Enter at least one value between {lower} and 8760")
         return sorted(set(values))
 
     @model_validator(mode="after")
     def valid_signals(self):
         if self.target.data_type == "bool":
-            raise ValueError("ML-boxen förutsäger numeriska mål. Boolean stöds som input.")
+            raise ValueError("The ML box predicts numeric targets. Boolean signals are supported as inputs.")
         if self.target.data_type == "int" and any(value is not None and value != round(value) for value in (self.minimum, self.maximum)):
-            raise ValueError("Gränser för Integer-output behöver vara heltal")
+            raise ValueError("Integer output bounds must be whole numbers")
         keys = [s.key for s in self.signals]
         if len(keys) != len(set(keys)) or "timestamp" in keys:
-            raise ValueError("Inputs och mål behöver unika namn; timestamp är reserverat")
+            raise ValueError("Inputs and target need unique names; timestamp is reserved")
         if self.source == "ha" and any(not s.entity_id for s in self.signals):
-            raise ValueError("Alla HA-signaler behöver en entity_id")
+            raise ValueError("All HA signals need an entity_id")
         if self.source == "ha" and any(s.statistic == "sum" for s in self.signals):
-            raise ValueError("Summa gäller periodvärden i CSV. Välj mätarökning för en ackumulerande HA-mätare.")
+            raise ValueError("Sum applies to CSV interval values. Select meter increment for cumulative HA meters.")
         if self.source == "ha" and self.step_minutes % 5 and any(s.statistic == "change" for s in self.signals):
-            raise ValueError("HA:s mätarökning kräver perioder som är multiplar av fem minuter.")
+            raise ValueError("HA meter increments require intervals that are multiples of five minutes.")
         if not self.inputs and not self.calendar and not self.use_target_history:
-            raise ValueError("Välj inputs, kalenderfält eller målets historik")
+            raise ValueError("Select inputs, calendar features or target history")
         if self.minimum is not None and self.maximum is not None and self.minimum >= self.maximum:
-            raise ValueError("Minimum måste vara mindre än maximum")
+            raise ValueError("Minimum must be less than maximum")
         if self.source != "ha" and self.auto_update:
-            raise ValueError("Automatisk insamling kräver Home Assistant som källa")
+            raise ValueError("Automatic collection requires Home Assistant signals")
         return self
 
     def signature(self):

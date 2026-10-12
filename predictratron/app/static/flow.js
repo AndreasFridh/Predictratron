@@ -1,7 +1,7 @@
 /* Signal graph: connections are compiled and validated by the server. */
 const FlowTypes = {float:'Float',int:'Integer',bool:'Boolean'};
-const CalendarNames = {hour:'Klockslag',weekday:'Veckodag',week:'Vecka',year_day:'Årstid'};
-const SignalNames = {rain:'Nederbörd',temperature:'Temperatur',consumption:'Timförbrukning',water_level:'Vattennivå i mark'};
+const CalendarNames = {hour:'Hour',weekday:'Weekday',week:'Week',year_day:'Season'};
+const SignalNames = {rain:'Rainfall',temperature:'Temperature',consumption:'Hourly consumption',water_level:'Soil water level'};
 
 class FlowEditor {
   constructor() {
@@ -9,7 +9,7 @@ class FlowEditor {
     this.armed=null;this.gesture=null;this.signalId=null;this.editingML=false;this.entities=[];
     $('new-model').onclick=()=>this.newDraft();$('first-model').onclick=()=>this.newDraft();
     $('clone').onclick=()=>this.newDraft(current()?.config);
-    $('show-examples').onclick=()=>{if(this.dirty&&!confirm('Lämna osparade ändringar på arbetsytan?'))return;this.isDraft=false;this.graph=null;this.modelId=null;selected=null;renderList();renderDetail();};
+    $('show-examples').onclick=()=>{if(this.dirty&&!confirm('Discard unsaved changes on the canvas?'))return;this.isDraft=false;this.graph=null;this.modelId=null;selected=null;renderList();renderDetail();};
     $('view-flow').onclick=()=>{this.mode='flow';renderDetail();};
     $('view-results').onclick=()=>{this.mode='results';renderDetail();};
     $('palette-toggle').onclick=()=>$('signal-palette').classList.toggle('open');
@@ -81,13 +81,13 @@ class FlowEditor {
   }
 
   newDraft(spec=null) {
-    if(this.dirty&&!confirm('Lämna osparade ändringar och skapa en ny arbetsyta?'))return;
+    if(this.dirty&&!confirm('Discard unsaved changes and create a new analysis flow?'))return;
     selected=null;this.isDraft=true;this.modelId=null;this.mode='flow';this.zoom=1;
     $('workbench').hidden=false;
-    const config=spec?{...structuredClone(spec),name:spec.name+' · kopia',source:spec.source==='demo'?'csv':spec.source,auto_update:false}:
-      {name:'Ny modell',source:'csv',target:{key:'output',entity_id:null,statistic:'mean',data_type:'float',label:'Outputsignal'},inputs:[],unit:'',resolution:'day',horizon:7,timezone:'Europe/Stockholm',calendar:[],lags:[0,1,2,7,14],windows:[3,7,14],use_target_history:true,minimum:null,maximum:null,auto_update:false,history_days:180,retrain_days:7};
+    const config=spec?{...structuredClone(spec),name:spec.name+' · copy',source:spec.source==='demo'?'csv':spec.source,auto_update:false}:
+      {name:'New analysis',source:'csv',target:{key:'output',entity_id:null,statistic:'mean',data_type:'float',label:'Output signal'},inputs:[],unit:'',resolution:'day',horizon:7,timezone:'Europe/Stockholm',calendar:[],lags:[0,1,2,7,14],windows:[3,7,14],use_target_history:true,minimum:null,maximum:null,auto_update:false,history_days:180,retrain_days:7};
     this.graph=this.makeGraph(config,!!spec);this.dirty=true;this.renderNodes();renderList();renderDetail();
-    if(!spec)this.help('Dra ut inputs och en outputsignal från Signaler. ML-boxen finns redan på arbetsytan.');
+    if(!spec)this.help('Add inputs and an output from Signals. The ML box is already on the canvas.');
   }
 
   show(item) {
@@ -95,7 +95,7 @@ class FlowEditor {
     $('workbench').hidden=false;
     if(item&&this.modelId!==item.id){
       $('csv-period').value='model';
-      if(this.isDraft&&this.dirty&&!confirm('Lämna osparade ändringar?')){selected=null;return;}
+      if(this.isDraft&&this.dirty&&!confirm('Discard unsaved changes?')){selected=null;return;}
       this.modelId=item.id;this.isDraft=false;this.dirty=false;this.mode='flow';this.zoom=1;
       this.graph=item.graph?structuredClone(item.graph):this.makeGraph(item.config);
       this.armed=null;this.renderNodes();
@@ -106,7 +106,7 @@ class FlowEditor {
     $('flow-area').hidden=this.mode==='results';
     $('view-flow').classList.toggle('active',this.mode==='flow');$('view-results').classList.toggle('active',this.mode==='results');
     $('view-results').disabled=!item;
-    $('flow-save-status').textContent=this.dirty?'Osparade ändringar':item?.graph?'Sparad arbetsyta':'Kopplingar från modellinställningarna';
+    $('flow-save-status').textContent=this.dirty?'Unsaved changes':item?.graph?'Analysis saved':'Connections from analysis settings';
     const busy=item?.status==='running';
     $('save-flow').disabled=busy;$('save-copy').disabled=busy;
     const dataSource=this.dataSource();
@@ -119,13 +119,13 @@ class FlowEditor {
     document.querySelectorAll('[data-ml-action]').forEach(button=>{
       const train=button.dataset.mlAction==='train';
       button.disabled=busy||!item||this.dirty||(train?!item.data.n:!item.metrics);
-      button.title=this.dirty?'Spara arbetsytan först':!item?'Spara för att skapa en egen modellinstans':busy?'Instansen arbetar':train?(item.data.n?'Träna denna instans på dess sparade historik':'Hämta eller importera historik först'):(item.metrics?'Använd denna instans tränade modell för framtida värden':'Träna denna instans först');
+      button.title=this.dirty?'Save the analysis first':!item?'Save to create an independent analysis':busy?'Analysis running':train?(item.data.n?'Train this analysis on its saved history':'Fetch or import history first'):(item.metrics?'Use this analysis trained model to forecast future values':'Train this analysis first');
     });
-    const instance=document.querySelector('.ml-instance');if(instance)instance.textContent=item?'Egen instans · '+item.id:'Ny instans · skapas vid sparning';
-    const data=document.querySelector('.ml-history');if(data)data.textContent=item?.data.n?`${fmt(item.data.n,0)} historiska perioder · egen historik`:'Ingen historik ännu';
-    $('flow-job-status').textContent=busy?'Modellen arbetar…':item?.trained_at?'Tränad '+date(item.trained_at):!item?'Spara för att skapa instansen.':!item.data.n?'Hämta eller importera historik för att träna.':'Historiken är redo för träning.';
+    const instance=document.querySelector('.ml-instance');if(instance)instance.textContent=item?'Analysis ID · '+item.id:'New analysis · created on save';
+    const data=document.querySelector('.ml-history');if(data)data.textContent=item?.data.n?`${fmt(item.data.n,0)} historical intervals · independent history`:'No history yet';
+    $('flow-job-status').textContent=busy?'Analysis running…':item?.trained_at?'Trained '+date(item.trained_at):!item?'Save to create the analysis.':!item.data.n?'Fetch or import history to train.':'History is ready for training.';
     $('flow-error').hidden=!item?.error;$('flow-error').textContent=item?.error||'';
-    const state=document.querySelector('.ml-state');if(state)state.textContent=busy?'Träning / bearbetning pågår…':item?.metrics?(item.metrics.beats_baseline?'Tränad · lägre fel än jämförelsen':'Tränad · behöver förbättras'):'Inte tränad ännu';
+    const state=document.querySelector('.ml-state');if(state)state.textContent=busy?'Training / processing…':item?.metrics?(item.metrics.beats_baseline?'Trained · lower error than baseline':'Trained · needs improvement'):'Not trained yet';
     this.validity();
   }
 
@@ -149,20 +149,20 @@ class FlowEditor {
   }
 
   markDirty() {this.dirty=true;this.show(current());this.validity();}
-  help(message=null) {$('flow-help').textContent=message||'Dra från en signals ○ till ML-boxens ○. Koppla sedan ML till output. Klicka på en linje för att ta bort kopplingen.';}
+  help(message=null) {$('flow-help').textContent=message||'Drag from a signal port to the ML box, then connect ML to output. Click a wire to remove it.';}
 
   renderNodes() {
     if(!this.graph)return;
     const incoming=this.graph.edges.filter(e=>e.target==='ml').map(e=>this.graph.nodes.find(n=>n.id===e.source)).filter(Boolean);
     const out=this.graph.edges.find(e=>e.source==='ml');
     const target=this.graph.nodes.find(n=>n.id===out?.target);
-    const port=(node,side)=>`<button class="node-port port-${side}" data-node="${node.id}" data-port="${side}" aria-label="${side==='out'?'Utgång':'Ingång'}: ${esc(node.kind==='ml'?'ML':node.signal?.label||node.signal?.key||CalendarNames[node.calendar])}" title="Dra eller klicka för att koppla"></button>`;
+    const port=(node,side)=>`<button class="node-port port-${side}" data-node="${node.id}" data-port="${side}" aria-label="${side==='out'?'Output port':'Input port'}: ${esc(node.kind==='ml'?'ML':node.signal?.label||node.signal?.key||CalendarNames[node.calendar])}" title="Drag or click to connect"></button>`;
     $('flow-nodes').innerHTML=this.graph.nodes.map(n=>{
-      if(n.kind==='ml')return `<article class="flow-node node-ml" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px" aria-label="ML-box ${esc(n.config.name)}"><div class="node-drag" data-drag="${n.id}"><span class="ml-symbol">✳</span><div class="ml-title">ML-box<small>${esc(n.config.name)}</small></div></div><button class="node-gear" data-edit="${n.id}" aria-label="Ändra ML-inställningar">⚙</button><div class="ml-body"><div class="ml-instance"></div><div class="ml-input-count">${incoming.length} anslutna inputs</div><div class="ml-output-label">→ ${esc(target?.signal?.label||target?.signal?.key||'Koppla en outputsignal')}</div><div class="ml-history"></div><div class="ml-state">Inte tränad ännu</div><div class="ml-actions"><button class="secondary" data-ml-action="train" disabled>1. Träna på historik</button><button class="primary" data-ml-action="forecast" disabled>2. Prediktera framtid</button></div><div class="ml-period"><button class="ml-period-button" data-period-settings="${n.id}" aria-label="Välj ML-boxens tidsperiod">${esc(periodName(n.config))} · ${esc(aggregateName(target?.signal||n.config.target))} ⚙</button></div><div class="ml-foot"><span>${n.config.horizon} × ${esc(periodName(n.config))} framåt</span><span>${n.config.use_target_history?'Tidigare output ingår':'Endast inputs'}</span></div></div>${port(n,'in')}${port(n,'out')}</article>`;
+      if(n.kind==='ml')return `<article class="flow-node node-ml" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px" aria-label="ML box ${esc(n.config.name)}"><div class="node-drag" data-drag="${n.id}"><span class="ml-symbol">✳</span><div class="ml-title">ML box<small>${esc(n.config.name)}</small></div></div><button class="node-gear" data-edit="${n.id}" aria-label="Edit ML settings">⚙</button><div class="ml-body"><div class="ml-instance"></div><div class="ml-input-count">${incoming.length} connected inputs</div><div class="ml-output-label">→ ${esc(target?.signal?.label||target?.signal?.key||'Connect an output signal')}</div><div class="ml-history"></div><div class="ml-state">Not trained yet</div><div class="ml-actions"><button class="secondary" data-ml-action="train" disabled>1. Train on history</button><button class="primary" data-ml-action="forecast" disabled>2. Predict future</button></div><div class="ml-period"><button class="ml-period-button" data-period-settings="${n.id}" aria-label="Select ML interval">${esc(periodName(n.config))} · ${esc(aggregateName(target?.signal||n.config.target))} ⚙</button></div><div class="ml-foot"><span>${n.config.horizon} × ${esc(periodName(n.config))} ahead</span><span>${n.config.use_target_history?'Target history included':'Inputs only'}</span></div></div>${port(n,'in')}${port(n,'out')}</article>`;
       const calendar=n.kind==='calendar',label=calendar?CalendarNames[n.calendar]:n.signal.label||n.signal.key;
       const type=calendar?'Integer':FlowTypes[n.signal.data_type||'float'];
-      const caption=calendar?'Kalender · skapas automatiskt':n.kind==='output'?'OUTPUT · mål för träning och prognos':n.signal.entity_id||'INPUT · '+n.signal.key;
-      return `<article class="flow-node node-${n.kind}" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px" aria-label="${esc(label)} (${type})"><div class="node-drag" data-drag="${n.id}"><span class="signal-symbol">○</span><span class="node-label">– ${esc(label)} <span class="node-type">(${type})</span></span></div><button class="node-gear" data-edit="${n.id}" aria-label="Ändra ${esc(label)}">⚙</button><div class="node-caption">${esc(caption)}</div>${port(n,n.kind==='output'?'in':'out')}</article>`;
+      const caption=calendar?'Calendar · generated automatically':n.kind==='output'?'OUTPUT · training and forecast target':n.signal.entity_id||'INPUT · '+n.signal.key;
+      return `<article class="flow-node node-${n.kind}" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px" aria-label="${esc(label)} (${type})"><div class="node-drag" data-drag="${n.id}"><span class="signal-symbol">○</span><span class="node-label">– ${esc(label)} <span class="node-type">(${type})</span></span></div><button class="node-gear" data-edit="${n.id}" aria-label="Edit ${esc(label)}">⚙</button><div class="node-caption">${esc(caption)}</div>${port(n,n.kind==='output'?'in':'out')}</article>`;
     }).join('');
     $('flow-nodes').querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>{
       const n=this.graph.nodes.find(n=>n.id===button.dataset.edit);
@@ -191,7 +191,7 @@ class FlowEditor {
     $('flow-wires').innerHTML=this.graph.edges.map((e,i)=>{
       const source=this.graph.nodes.find(n=>n.id===e.source);if(!source)return'';
       const d=this.curve(this.socket(e.source,'out'),this.socket(e.target,'in'));
-      return `<path class="wire-visible ${source.kind==='calendar'?'calendar-wire':source.kind==='ml'?'output-wire':''}" d="${d}"/><path class="wire-hit" d="${d}" data-edge="${i}" role="button" tabindex="0" aria-label="Ta bort koppling ${esc(source.signal?.label||source.signal?.key||CalendarNames[source.calendar]||'ML')}"/>`;
+      return `<path class="wire-visible ${source.kind==='calendar'?'calendar-wire':source.kind==='ml'?'output-wire':''}" d="${d}"/><path class="wire-hit" d="${d}" data-edge="${i}" role="button" tabindex="0" aria-label="Remove connection ${esc(source.signal?.label||source.signal?.key||CalendarNames[source.calendar]||'ML')}"/>`;
     }).join('');
     const from=this.gesture?.kind==='wire'?this.gesture.port:this.armed;
     if(from&&point){const start=this.socket(from.node,from.side);$('flow-wires').innerHTML+=`<path class="wire-draft" d="${from.side==='out'?this.curve(start,point):this.curve(point,start)}"/>`;}
@@ -233,17 +233,17 @@ class FlowEditor {
     if(g.kind==='move'){document.querySelector('.moving')?.classList.remove('moving');if(g.moved)this.markDirty();return;}
     const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-port]');
     if(target&&(target.dataset.node!==g.port.node||target.dataset.port!==g.port.side))this.connect(g.port,{node:target.dataset.node,side:target.dataset.port});
-    else if(!g.moved){this.armed=g.port;this.help('Port vald. Klicka på mottagarens ○ eller tryck Escape för att avbryta.');}
-    else this.help('Släpp kopplingen på en passande ○-port.');
+    else if(!g.moved){this.armed=g.port;this.help('Port selected. Click the destination port or press Escape to cancel.');}
+    else this.help('Drop the wire on a compatible port.');
     this.drawWires();
   }
 
   connect(a,b) {
-    if(a.side===b.side){this.help('Koppla en utgång till en ingång.');return;}
+    if(a.side===b.side){this.help('Connect an output port to an input port.');return;}
     const from=a.side==='out'?a:b,to=a.side==='in'?a:b;
     const source=this.graph.nodes.find(n=>n.id===from.node),target=this.graph.nodes.find(n=>n.id===to.node);
-    if(!((['input','calendar'].includes(source.kind)&&target.kind==='ml')||(source.kind==='ml'&&target.kind==='output'))){this.help('Koppla inputs till ML och ML till output.');return;}
-    if(this.graph.edges.some(e=>e.source===source.id&&e.target===target.id)){this.help('Signalerna är redan kopplade.');return;}
+    if(!((['input','calendar'].includes(source.kind)&&target.kind==='ml')||(source.kind==='ml'&&target.kind==='output'))){this.help('Connect inputs to ML and ML to output.');return;}
+    if(this.graph.edges.some(e=>e.source===source.id&&e.target===target.id)){this.help('These signals are already connected.');return;}
     if(source.kind==='ml')this.graph.edges=this.graph.edges.filter(e=>e.source!==source.id);
     this.graph.edges.push({source:source.id,target:target.id});this.renderNodes();this.markDirty();this.help();
   }
@@ -258,7 +258,7 @@ class FlowEditor {
     else {
       entity=template.startsWith('ha:')?this.entities[Number(template.split(':')[1])]:null;
       const key=unique(entity?entity.entity_id.split('.')[1].slice(0,30):template==='custom'?'signal':template==='output'?'output':template);
-      node={id,kind:template==='output'?'output':'input',signal:{key,label:entity?.name||(template==='output'?'Outputsignal':template==='custom'?'Egen signal':SignalNames[template]),entity_id:entity?.entity_id||null,statistic:entity?.entity_id.startsWith('binary_sensor.')?'last':template==='rain'?'change':'mean',data_type:entity?.entity_id.startsWith('binary_sensor.')?'bool':'float'}};
+      node={id,kind:template==='output'?'output':'input',signal:{key,label:entity?.name||(template==='output'?'Output signal':template==='custom'?'Custom signal':SignalNames[template]),entity_id:entity?.entity_id||null,statistic:entity?.entity_id.startsWith('binary_sensor.')?'last':template==='rain'?'change':'mean',data_type:entity?.entity_id.startsWith('binary_sensor.')?'bool':'float'}};
     }
     const offset=this.graph.nodes.filter(n=>n.kind!=='ml').length;
     const where=position||{x:30+(offset%2)*25,y:70+offset*105};
@@ -267,18 +267,18 @@ class FlowEditor {
     const canvas=$('flow-canvas'),added=this.graph.nodes.at(-1);
     if(added.y*this.zoom>canvas.scrollTop+canvas.clientHeight-130)canvas.scrollTo({top:Math.max(0,added.y*this.zoom-80),left:canvas.scrollLeft,behavior:'smooth'});
     if(position)$('signal-palette').classList.remove('open');
-    this.help('Signalen är tillagd. Koppla dess ○ till ML-boxen.');
+    this.help('Signal added. Connect its port to the ML box.');
     if(!entity&&node.kind!=='calendar')this.editSignal(this.graph.nodes.at(-1));
   }
 
   editSignal(node) {
     this.signalId=node.id;const form=$('signal-form');form.reset();
     for(const field of form.querySelectorAll('input,select')){field.disabled=false;field.readOnly=false;}
-    form.querySelector('[type=submit]').textContent='Använd signal';
+    form.querySelector('[type=submit]').textContent='Apply signal';
     for(const [key,value] of Object.entries(node.signal)){if(form.elements[key])form.elements[key].value=value??'';}
     form.elements.data_type.value=node.signal.data_type||'float';
-    $('signal-role').textContent=node.kind==='output'?'OUTPUTSIGNAL':'INPUTSIGNAL';
-    $('signal-note').textContent=node.kind==='output'?'Den uppmätta signalen är målet vid träning. ML-boxen skickar sin framtida prognos till denna output.':'Välj signalens datakälla. Koppla sedan signalen till ML-boxen.';
+    $('signal-role').textContent=node.kind==='output'?'OUTPUT SIGNAL':'INPUT SIGNAL';
+    $('signal-note').textContent=node.kind==='output'?'The measured signal is the training target. The ML box sends its forecast to this output.':'Choose the signal mapping, then connect it to the ML box.';
     $('signal-error').hidden=true;$('signal-dialog').showModal();
   }
 
@@ -286,8 +286,8 @@ class FlowEditor {
     e.preventDefault();const data=new FormData(e.target),node=this.graph.nodes.find(n=>n.id===this.signalId);
     if(node.kind==='calendar'){$('signal-dialog').close();return;}
     const key=data.get('key');
-    if(this.graph.nodes.some(n=>n.id!==node.id&&n.signal?.key===key)){$('signal-error').textContent='Varje signal behöver ett unikt kolumnnamn.';$('signal-error').hidden=false;return;}
-    if(node.kind==='output'&&data.get('data_type')==='bool'){$('signal-error').textContent='ML-boxen förutsäger numeriska mål. Boolean kan användas som input.';$('signal-error').hidden=false;return;}
+    if(this.graph.nodes.some(n=>n.id!==node.id&&n.signal?.key===key)){$('signal-error').textContent='Each signal needs a unique column name.';$('signal-error').hidden=false;return;}
+    if(node.kind==='output'&&data.get('data_type')==='bool'){$('signal-error').textContent='The ML box predicts numeric targets. Boolean signals can be inputs.';$('signal-error').hidden=false;return;}
     node.signal={key,label:data.get('label'),entity_id:data.get('entity_id')||null,statistic:data.get('statistic'),data_type:data.get('data_type')};
     $('signal-dialog').close();this.renderNodes();this.markDirty();
   }
@@ -299,7 +299,7 @@ class FlowEditor {
     form.elements.data_type.value='int';form.elements.data_type.disabled=true;
     form.elements.entity_id.value='';form.elements.entity_id.disabled=true;
     form.elements.statistic.disabled=true;form.querySelector('[type=submit]').textContent='Klar';
-    $('signal-role').textContent='KALENDERSIGNAL';$('signal-note').textContent='Kalendern skapas automatiskt i modellens tidszon. Koppla signalen till ML-boxen för att använda den.';
+    $('signal-role').textContent='CALENDAR SIGNAL';$('signal-note').textContent='Calendar features use the analysis time zone. Connect the signal to the ML box to use it.';
     $('signal-error').hidden=true;$('signal-dialog').showModal();
   }
 
@@ -312,19 +312,19 @@ class FlowEditor {
     if(!this.graph)return;const box=this.graph.nodes.find(n=>n.kind==='ml');
     openForm(box.config);this.editingML=true;
     const form=$('model-form');form.classList.add('ml-edit-mode');form.elements.name.value=box.config.name;
-    if(!form.elements.source.querySelector('[value=demo]'))form.elements.source.add(new Option('Syntetisk demo','demo'));
+    if(!form.elements.source.querySelector('[value=demo]'))form.elements.source.add(new Option('Synthetic demo','demo'));
     form.elements.source.value=box.config.source;form.elements.source.disabled=true;
     form.elements.auto_update.disabled=this.dataSource()!=='ha';
-    $('target-section-title').textContent='Prognosinställningar';
-    form.querySelector('.dialog-heading h2').textContent='ML-boxens inställningar';
-    form.querySelector('[type=submit]').textContent='Använd inställningar';
+    $('target-section-title').textContent='Forecast settings';
+    form.querySelector('.dialog-heading h2').textContent='ML box settings';
+    form.querySelector('[type=submit]').textContent='Apply settings';
     updatePeriodPreview();
   }
 
   saveML(e) {
     e.preventDefault();const fd=new FormData(e.target),box=this.graph.nodes.find(n=>n.kind==='ml');
     try{
-      const offsets=key=>String(fd.get(key)).split(',').map(s=>{if(!/^\s*\d+\s*$/.test(s))throw new Error('Ange heltal med kommatecken mellan.');return Number(s);});
+      const offsets=key=>String(fd.get(key)).split(',').map(s=>{if(!/^\s*\d+\s*$/.test(s))throw new Error('Enter comma-separated integers.');return Number(s);});
       const bound=key=>fd.get(key)===''?null:Number(fd.get(key));
       box.config={...box.config,name:fd.get('name'),source:this.dataSource()==='mixed'?box.config.source:this.dataSource(),unit:fd.get('unit'),resolution:fd.get('resolution'),period_minutes:Number(fd.get('period_minutes')),horizon:Number(fd.get('horizon')),timezone:fd.get('timezone'),lags:offsets('lags'),windows:offsets('windows'),use_target_history:fd.has('use_target_history'),minimum:bound('minimum'),maximum:bound('maximum'),auto_update:this.dataSource()==='ha'&&fd.has('auto_update'),history_days:Number(fd.get('history_days')),retrain_days:Number(fd.get('retrain_days'))};
       $('model-dialog').close();this.renderNodes();this.markDirty();
@@ -333,7 +333,7 @@ class FlowEditor {
 
   validity() {
     if(!this.graph)return;const inputs=this.graph.edges.filter(e=>e.target==='ml').length,outputs=this.graph.edges.filter(e=>e.source==='ml').length;
-    $('flow-validity').textContent=outputs===1?`${inputs} inputs → ML → 1 output`:'Koppla en output för att spara';
+    $('flow-validity').textContent=outputs===1?`${inputs} inputs → ML → 1 output`:'Connect an output to save';
   }
 
   async save(copy) {
@@ -343,10 +343,10 @@ class FlowEditor {
       const creating=copy||!this.modelId;
       const payload=structuredClone(this.graph);
       if(this.dataSource()!=='mixed')payload.nodes.find(node=>node.kind==='ml').config.source=this.dataSource();
-      if(copy)payload.nodes.find(n=>n.kind==='ml').config.name+=' · kopia';
+      if(copy)payload.nodes.find(n=>n.kind==='ml').config.name+=' · copy';
       const item=await api(creating?'graphs':`models/${this.modelId}/graph`,{method:creating?'POST':'PUT',body:JSON.stringify(payload)});
       selected=item.id;this.modelId=item.id;this.graph=structuredClone(item.graph);this.isDraft=false;this.dirty=false;
-      this.renderNodes();await refresh();toast(creating?'Modellinstansen är skapad. Hämta eller importera historik.':'Kopplingar och placeringar är sparade.');
+      this.renderNodes();await refresh();toast(creating?'Analysis created. Fetch or import history.':'Analysis connections and positions saved.');
     }catch(error){$('flow-error').textContent=error.message;$('flow-error').hidden=false;toast(error.message);}finally{button.disabled=false;}
   }
 }

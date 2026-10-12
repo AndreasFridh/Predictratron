@@ -36,7 +36,7 @@ class Store:
                 spec = ModelSpec.model_validate_json(row["config"])
                 con.execute("UPDATE models SET data_schema=? WHERE id=?", (json.dumps(self.schema(spec)), row["id"]))
             # A process restart cannot resume a partly completed operation.
-            con.execute("UPDATE models SET status='idle', error='Arbetet avbröts vid omstart' WHERE status='running'")
+            con.execute("UPDATE models SET status='idle', error='Job interrupted by restart' WHERE status='running'")
 
     @contextmanager
     def connect(self):
@@ -83,10 +83,10 @@ class Store:
         incoming = self.schema(spec)
         if item["data"]["n"]:
             if old.source != spec.source or old.step_minutes != spec.step_minutes or incoming[spec.target.key] != manifest.get(old.target.key):
-                raise ValueError("Mål, datakälla eller upplösning har ändrats. Spara som ny modell för att behålla den gamla historiken.")
+                raise ValueError("Target, history source or interval changed. Save as a new analysis to preserve existing history.")
             for key, contract in incoming.items():
                 if key in manifest and contract != manifest[key]:
-                    raise ValueError(f"Datakällan eller typen för {key} har ändrats. Spara som ny modell för att undvika att blanda mätvärden.")
+                    raise ValueError(f"Source or type for {key} changed. Save as a new analysis to avoid mixing measurements.")
         changed = old.signature() != spec.signature()
         with self.connect() as con:
             con.execute("UPDATE models SET config=?, graph=?, data_schema=?, error=NULL, status='idle' WHERE id=?",
@@ -116,9 +116,9 @@ class Store:
         for signal in spec.signals:
             values = frame[signal.key].dropna()
             if signal.data_type == "bool" and not values.isin([0, 1]).all():
-                raise ValueError(f"{signal.key} är Boolean och behöver värden 0 eller 1")
+                raise ValueError(f"{signal.key} is Boolean and needs values 0 or 1")
             if signal.data_type == "int" and not (values == values.round()).all():
-                raise ValueError(f"{signal.key} är Integer och behöver heltal")
+                raise ValueError(f"{signal.key} is Integer and needs whole numbers")
         rows = []
         for stamp, values in frame.iterrows():
             clean = {k: float(v) if pd.notna(v) else None for k, v in values.items()}
@@ -134,7 +134,7 @@ class Store:
         with self.connect() as con:
             rows = con.execute("SELECT timestamp, values_json FROM samples WHERE model_id=? ORDER BY timestamp", (model_id,)).fetchall()
         if not rows:
-            raise ValueError("Ingen historik ännu. Hämta från HA eller importera CSV.")
+            raise ValueError("No history yet. Fetch from HA or import CSV.")
         frame = pd.DataFrame([json.loads(r[1]) for r in rows], index=pd.to_datetime([r[0] for r in rows], utc=True))
         frame.index.name = "timestamp"
         return frame.reindex(columns=[signal.key for signal in self.spec(model_id).signals]).astype(float)

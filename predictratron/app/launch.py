@@ -10,7 +10,7 @@ def configure(environ, options_path=Path("/data/options.json")):
     options = json.loads(options_path.read_text()) if options_path.exists() else {}
     level = options.get("log_level", "info")
     if level not in {"debug", "info", "warning", "error"}:
-        raise ValueError("Ogiltig loggnivå")
+        raise ValueError("Invalid log level")
     if environ.get("SUPERVISOR_TOKEN"):
         environ.setdefault("HA_URL", "http://supervisor/core")
         environ["INGRESS_ONLY"] = "true"

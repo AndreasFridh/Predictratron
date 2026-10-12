@@ -20,11 +20,11 @@ class Node(BaseModel):
     @model_validator(mode="after")
     def payload(self):
         if self.kind in {"input", "output"} and not self.signal:
-            raise ValueError("Signalen saknar inställningar")
+            raise ValueError("Signal settings are missing")
         if self.kind == "calendar" and not self.calendar:
-            raise ValueError("Kalendersignalen saknar kalenderfält")
+            raise ValueError("Calendar feature is missing")
         if self.kind == "ml" and not self.config:
-            raise ValueError("ML-boxen saknar modellinställningar")
+            raise ValueError("ML box settings are missing")
         return self
 
 
@@ -43,37 +43,37 @@ class Graph(BaseModel):
     def compile(self):
         ids = [node.id for node in self.nodes]
         if len(ids) != len(set(ids)):
-            raise ValueError("Noderna behöver unika id")
+            raise ValueError("Nodes need unique IDs")
         nodes = {node.id: node for node in self.nodes}
         boxes = [node for node in self.nodes if node.kind == "ml"]
         if len(boxes) != 1:
-            raise ValueError("Varje modellinstans behöver exakt en ML-box")
+            raise ValueError("Each analysis needs exactly one ML box")
         box = boxes[0]
         seen = set()
         inputs, calendars, outputs = [], [], []
         for edge in self.edges:
             pair = (edge.source, edge.target)
             if pair in seen:
-                raise ValueError("Samma koppling finns flera gånger")
+                raise ValueError("Duplicate connection")
             seen.add(pair)
             if edge.source not in nodes or edge.target not in nodes:
-                raise ValueError("Kopplingen hänvisar till en signal som saknas")
+                raise ValueError("Connection references a missing signal")
             source, target = nodes[edge.source], nodes[edge.target]
             if source.kind in {"input", "calendar"} and target.id == box.id:
                 (inputs if source.kind == "input" else calendars).append(source)
             elif source.id == box.id and target.kind == "output":
                 outputs.append(target)
             else:
-                raise ValueError("Koppla inputsignaler till ML-boxen och ML-boxen till outputsignalen")
+                raise ValueError("Connect input signals to the ML box and the ML box to the output signal")
         if len(outputs) != 1:
-            raise ValueError("Koppla ML-boxen till exakt en outputsignal")
+            raise ValueError("Connect the ML box to exactly one output signal")
         calendar_keys = [node.calendar for node in calendars]
         if len(calendar_keys) != len(set(calendar_keys)):
-            raise ValueError("Samma kalenderfält kan bara kopplas in en gång")
+            raise ValueError("Connect each calendar feature only once")
         signals = [outputs[0].signal, *[node.signal for node in inputs]]
         ha_signals = [signal for signal in signals if signal.entity_id]
         if ha_signals and len(ha_signals) != len(signals):
-            raise ValueError("Alla anslutna mätvärdessignaler behöver en HA-sensor, eller vara CSV-kolumner utan HA-sensor. Blandade datakällor stöds inte ännu.")
+            raise ValueError("All connected measurement signals must map to HA sensors or CSV columns without HA sensors. Mixed history sources are not supported yet.")
         data_source = "ha" if ha_signals else "demo" if box.config.get("source") == "demo" else "csv"
         return ModelSpec.model_validate({**box.config,
                                         "source": data_source,

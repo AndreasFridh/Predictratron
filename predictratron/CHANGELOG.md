@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Use English throughout the interface and user-facing errors.
+- Rename workspaces to analysis flows, with Save analysis and New analysis actions.
+- Add a persistent collapsible sidebar, analysis search, status filters and bounded lists.
+- Hide demo analyses and disable demo creation in release builds; enable with APP_BUILD=development.
+- Preserve existing analysis histories, model artifacts and user-defined names.
+
 ## 0.3.1
 
 - Remove the data source selector from ML box settings.

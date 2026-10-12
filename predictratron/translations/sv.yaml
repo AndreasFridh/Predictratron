@@ -1,4 +1,4 @@
 configuration:
   log_level:
-    name: Loggnivå
-    description: Hur mycket information appen skriver i loggen. Info rekommenderas.
+    name: Log level
+    description: Amount of information written to the app log. Info is recommended.

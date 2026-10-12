@@ -1,5 +1,7 @@
 FROM python:3.12-slim
-ARG BUILD_VERSION=0.3.1
+ARG APP_BUILD=release
+ENV APP_BUILD=${APP_BUILD}
+ARG BUILD_VERSION=0.4.0
 ARG BUILD_ARCH=amd64
 LABEL io.hass.name="Predictratron" io.hass.description="Local time-series prediction for Home Assistant" \
     io.hass.version="${BUILD_VERSION}" io.hass.type="app" io.hass.arch="${BUILD_ARCH}" \

@@ -1,7 +1,10 @@
 services:
   predictor:
-    build: .
-    image: predictratron:0.3.1
+    build:
+      context: .
+      args:
+        APP_BUILD: ${APP_BUILD:-release}
+    image: predictratron:0.4.0
     ports:
       - "127.0.0.1:8080:8080"
     env_file:

@@ -21,11 +21,11 @@ def parse_csv(content: bytes, spec: ModelSpec, input_minutes=None):
     try:
         frame = pd.read_csv(io.BytesIO(content))
     except Exception as exc:
-        raise ValueError("CSV kunde inte läsas. Använd komma som avskiljare.") from exc
+        raise ValueError("Cannot read CSV. Use comma separators.") from exc
     columns = [s.key for s in spec.signals]
     missing = set(["timestamp", *columns]) - set(frame.columns)
     if missing:
-        raise ValueError("CSV saknar kolumner: " + ", ".join(sorted(missing)))
+        raise ValueError("CSV is missing columns: " + ", ".join(sorted(missing)))
     # Naive timestamps are rejected to avoid silent DST and local-time errors.
     try:
         stamps = [pd.Timestamp(x) for x in frame["timestamp"]]
@@ -33,42 +33,42 @@ def parse_csv(content: bytes, spec: ModelSpec, input_minutes=None):
             raise ValueError()
         frame.index = pd.to_datetime(stamps, utc=True)
     except Exception as exc:
-        raise ValueError("timestamp måste ha tidszon, exempelvis 2026-10-11T09:00:00Z") from exc
+        raise ValueError("timestamp needs a time zone, for example 2026-10-11T09:00:00Z") from exc
     if frame.index.has_duplicates:
-        raise ValueError("CSV innehåller dubbla tidsstämplar")
+        raise ValueError("CSV contains duplicate timestamps")
     input_minutes = spec.step_minutes if input_minutes is None else input_minutes
     if input_minutes < 1 or spec.step_minutes % input_minutes:
-        raise ValueError("CSV-perioden måste vara en jämn del av ML-boxens tidsperiod. Uppsampling stöds inte.")
+        raise ValueError("CSV interval must evenly divide the ML interval. Upsampling is not supported.")
     source_spec = spec.model_copy(update={"resolution": "custom", "period_minutes": input_minutes})
     if not (frame.index == source_spec.floor(frame.index)).all():
-        raise ValueError("Tidsstämplar måste ligga på gränserna för vald CSV-period i UTC")
+        raise ValueError("Timestamps must align with the selected CSV interval boundaries in UTC")
     if frame.empty or len(frame) > 200_000:
-        raise ValueError("CSV behöver innehålla 1–200 000 rader")
+        raise ValueError("CSV needs 1–200,000 rows")
     selected = frame[columns].copy()
     for col in columns:
         try:
             selected[col] = pd.to_numeric(selected[col], errors="raise")
         except Exception as exc:
-            raise ValueError(f"{col} måste innehålla numeriska värden eller tomma fält") from exc
+            raise ValueError(f"{col} must contain numeric values or empty fields") from exc
         if np.isinf(selected[col]).any():
-            raise ValueError(f"{col} innehåller oändliga värden")
+            raise ValueError(f"{col} contains infinite values")
     if not selected[spec.target.key].notna().any():
-        raise ValueError("Målkolumnen saknar mätvärden")
+        raise ValueError("Target column has no measurements")
     current = source_spec.floor(pd.Timestamp.now(tz="UTC"))
     if (selected.index > current).any():
-        raise ValueError("Historik får inte innehålla framtida mätvärden")
+        raise ValueError("History cannot contain future measurements")
     selected = selected.sort_index()
     if input_minutes != spec.step_minutes:
         selected = aggregate_periods(selected, spec, input_minutes)
         if selected.empty:
-            raise ValueError("CSV innehåller inga kompletta avslutade modellperioder. Importera längre historik eller välj en kortare period.")
+            raise ValueError("CSV contains no complete finished intervals. Import longer history or choose a shorter interval.")
     return selected
 
 
 def aggregate_periods(frame, spec, input_minutes):
     """Aggregate complete end-labelled source periods; never invent missing data."""
     if spec.step_minutes % input_minutes:
-        raise ValueError("Källperioden måste vara en jämn del av modellperioden")
+        raise ValueError("Source interval must evenly divide the analysis interval")
     expected = spec.step_minutes // input_minutes
     result = {}
     for signal in spec.signals:
@@ -89,12 +89,12 @@ def grid(frame, spec):
     current = spec.floor(pd.Timestamp.now(tz="UTC"))
     frame = frame.loc[frame.index <= current]
     if frame.empty:
-        raise ValueError("Inga avslutade mätperioder finns")
+        raise ValueError("No completed measurement intervals")
     # Every row describes the period ENDING at timestamp; gaps stay missing.
     start, end = frame.index.min(), frame.index.max()
     count = int((end - start) / pd.Timedelta(spec.freq)) + 1
     if count > 200_000:
-        raise ValueError("Historiken omfattar fler än 200 000 mätperioder")
+        raise ValueError("History exceeds 200,000 measurement intervals")
     return frame.reindex(pd.date_range(start, end, freq=spec.freq, tz="UTC"))
 
 
@@ -143,7 +143,7 @@ def train(frame, spec):
     frame = grid(frame, spec)
     for signal in spec.inputs:
         if not frame[signal.key].notna().any():
-            raise ValueError(f"Historik saknas för {signal.key}. Hämta eller importera historik för den nya signalen.")
+            raise ValueError(f"History missing for {signal.key}. Fetch or import history for the new signal.")
     x = features(frame, spec)
     target = frame[spec.target.key]
     y = pd.concat([target.shift(-h).rename(str(h)) for h in range(1, spec.horizon + 1)], axis=1)
@@ -152,14 +152,14 @@ def train(frame, spec):
     valid.iloc[:spec.warmup] = False
     x, y = x.loc[valid], y.loc[valid]
     if len(x) < 100:
-        raise ValueError(f"Bara {len(x)} användbara prognosstarter. Minst 100 behövs efter fördröjningar, luckor och prognoslängd.")
+        raise ValueError(f"Only {len(x)} usable forecast origins. At least 100 are needed after lags, gaps and horizon.")
     split = int(len(x) * 0.8)
     test_start = x.index[split]
     train_mask = x.index + pd.Timedelta(hours=spec.horizon * spec.step_hours) < test_start
     x_train, y_train = x.loc[train_mask], y.loc[train_mask]
     x_test, y_test = x.iloc[split:], y.iloc[split:]
     if len(x_train) < 50 or len(x_test) < 20:
-        raise ValueError("För lite historik för ett test utan överlappande framtida målvärden. Hämta mer data eller korta prognosen.")
+        raise ValueError("Insufficient history for validation without overlapping future targets. Fetch more data or shorten the horizon.")
     model = estimator()
     model.fit(x_train, y_train)
     predicted = clip(np.asarray(model.predict(x_test)).reshape(len(x_test), spec.horizon), spec)
@@ -212,16 +212,16 @@ def train(frame, spec):
 
 def forecast(frame, spec, artifact):
     if spec.signature() != ModelSpec.model_validate(artifact["spec"]).signature():
-        raise ValueError("Modellinställningarna har ändrats. Träna om modellen.")
+        raise ValueError("ML settings changed. Retrain the model.")
     frame = grid(frame, spec)
     latest = frame.index[-1]
     now = spec.floor(pd.Timestamp.now(tz="UTC"))
     if now - latest > 2 * pd.Timedelta(spec.freq):
-        raise ValueError("Historiken är för gammal för en aktuell prognos. Hämta nya mätvärden först.")
+        raise ValueError("History is too old for a current forecast. Fetch new measurements first.")
     if pd.isna(frame[spec.target.key].iloc[-1]):
-        raise ValueError("Det senaste målvärdet saknas. Hämta nya mätvärden först.")
+        raise ValueError("Latest target value is missing. Fetch new measurements first.")
     if len(frame) <= spec.warmup:
-        raise ValueError("För lite historik för valda fördröjningar")
+        raise ValueError("Insufficient history for selected lags")
     missing = [s.key for s in spec.inputs if pd.isna(frame[s.key].iloc[-1])]
     if missing:
         raise ValueError("Senaste input saknas: " + ", ".join(missing))
@@ -237,11 +237,11 @@ def forecast(frame, spec, artifact):
         points.append({"start": (end - pd.Timedelta(spec.freq)).isoformat(), "end": end.isoformat(),
                        "value": float(value), "lower": float(lower), "upper": float(upper)})
     if not points:
-        raise ValueError("Alla prognosperioder har redan passerat. Hämta ny historik.")
+        raise ValueError("All forecast intervals have expired. Fetch new history.")
     return {"issued_at": now_utc(), "origin": latest.isoformat(), "unit": spec.unit,
             "resolution": spec.resolution, "period_minutes": spec.step_minutes, "points": points,
-            "warning": None if artifact["metrics"]["beats_baseline"] else "Modellen slog inte jämförelseprognosen i senaste testet.",
-            "interval_note": "Bandet visar 90:e percentilen av absoluta fel i historiktestet; ingen garanterad täckning."}
+            "warning": None if artifact["metrics"]["beats_baseline"] else "The model did not beat the baseline in the latest validation.",
+            "interval_note": "The band shows the 90th percentile of absolute validation errors; coverage is not guaranteed."}
 
 
 def save_artifact(path, artifact):
@@ -261,7 +261,7 @@ def demo_data(kind):
         temp = 7 + 7 * np.sin(t / (24 * 15)) + rng.normal(0, 1, n)
         hour = index.tz_convert("Europe/Stockholm").hour.to_numpy()
         load = 0.5 + np.maximum(0, 15 - temp) * 0.07 + 0.6 * ((hour >= 17) & (hour <= 21)) + rng.normal(0, 0.05, n)
-        spec = ModelSpec(name="Elförbrukning · DEMO", source="demo", target={"key": "consumption"},
+        spec = ModelSpec(name="Electricity consumption · DEMO", source="demo", target={"key": "consumption"},
                          inputs=[{"key": "temperature"}], unit="kWh", horizon=24, minimum=0)
         frame = pd.DataFrame({"consumption": load, "temperature": temp}, index=index)
     else:
@@ -270,7 +270,7 @@ def demo_data(kind):
         level[0] = 40
         for i in range(1, n):
             level[i] = 30 + (level[i - 1] - 30) * 0.94 + rain[i - 1] * 0.8 + rng.normal(0, 0.15)
-        spec = ModelSpec(name="Markvattennivå · DEMO", source="demo", target={"key": "water_level"},
+        spec = ModelSpec(name="Soil water level · DEMO", source="demo", target={"key": "water_level"},
                          inputs=[{"key": "rain"}], unit="cm", resolution=resolution, horizon=7,
                          calendar=["week", "year_day"], lags=[0, 1, 2, 7, 14], windows=[3, 7, 14], minimum=0)
         frame = pd.DataFrame({"water_level": level, "rain": rain}, index=index)

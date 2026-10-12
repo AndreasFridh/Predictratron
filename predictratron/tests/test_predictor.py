@@ -67,18 +67,18 @@ def test_daily_forecast_dates_bounds_and_metadata(water):
         assert point["lower"] <= point["value"] <= point["upper"]
         assert point["value"] >= 0
     assert result["unit"] == "cm"
-    assert "garanterad" in result["interval_note"]
+    assert "not guaranteed" in result["interval_note"]
 
 
 def test_stale_and_missing_latest_inputs_are_rejected(water):
     spec, frame, artifact = water
     stale = frame.copy()
     stale.index -= pd.Timedelta(days=3)
-    with pytest.raises(ValueError, match="gammal"):
+    with pytest.raises(ValueError, match="too old"):
         forecast(stale, spec, artifact)
     missing = frame.copy()
     missing.loc[missing.index[-1], "rain"] = np.nan
-    with pytest.raises(ValueError, match="input saknas"):
+    with pytest.raises(ValueError, match="input"):
         forecast(missing, spec, artifact)
 
 
@@ -102,7 +102,7 @@ def test_csv_contract_no_double_aggregation():
     result = parse_csv(content, csv_spec())
     assert result.iloc[0]["rain"] == 3
     assert result.index.tz is not None
-    with pytest.raises(ValueError, match="kolumner"):
+    with pytest.raises(ValueError, match="columns"):
         parse_csv(b"timestamp,level\n2026-01-01T01:00:00Z,42\n", csv_spec())
 
 
@@ -177,7 +177,7 @@ def wait_job(client, model_id, timeout=30):
 
 
 def test_api_demo_train_predict_and_restarted_storage(tmp_path):
-    app = create_app(tmp_path, HAClient(url="", token=""))
+    app = create_app(tmp_path, HAClient(url="", token=""), dev_mode=True)
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
         item = client.post("/api/demo/water").json()
@@ -189,13 +189,13 @@ def test_api_demo_train_predict_and_restarted_storage(tmp_path):
         result = client.get(f"/api/models/{model_id}/forecast").json()
         assert len(result["points"]) == 7
         assert client.get("/api/models/not-a-model").status_code == 404
-    with TestClient(create_app(tmp_path, HAClient(url="", token=""))) as client:
+    with TestClient(create_app(tmp_path, HAClient(url="", token=""), dev_mode=True)) as client:
         assert len(client.get("/api/models").json()) == 1
         assert client.get(f"/api/models/{model_id}/forecast").status_code == 200
 
 
 def test_instances_train_and_predict_independently(tmp_path):
-    with TestClient(create_app(tmp_path, HAClient(url="", token=""))) as client:
+    with TestClient(create_app(tmp_path, HAClient(url="", token=""), dev_mode=True)) as client:
         first = client.post("/api/demo/water").json()["id"]
         second = client.post("/api/demo/water").json()["id"]
         untouched = client.get(f"/api/models/{second}").json()
@@ -214,7 +214,7 @@ def test_instances_train_and_predict_independently(tmp_path):
 
 def test_csv_import_api_and_auth(tmp_path, monkeypatch):
     monkeypatch.setenv("APP_TOKEN", "test-app-key")
-    with TestClient(create_app(tmp_path, HAClient(url="", token=""))) as client:
+    with TestClient(create_app(tmp_path, HAClient(url="", token=""), dev_mode=True)) as client:
         assert client.get("/api/models").status_code == 401
         assert client.get("/health").status_code == 200
         headers = {"Authorization":"Bearer test-app-key"}

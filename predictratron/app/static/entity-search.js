@@ -1,8 +1,8 @@
 /* Matching is literal except for * (any characters) and ? (one character). */
 const EntitySearch = {
   matches(entity, query) {
-    const text = String(query || '').trim().toLocaleLowerCase('sv-SE');
-    const fields = [entity.entity_id, entity.name].map(value => String(value || '').toLocaleLowerCase('sv-SE'));
+    const text = String(query || '').trim().toLocaleLowerCase('en-GB');
+    const fields = [entity.entity_id, entity.name].map(value => String(value || '').toLocaleLowerCase('en-GB'));
     if (!text) return true;
     if (!/[?*]/.test(text)) return fields.some(value => value.includes(text));
     return fields.some(value => {
@@ -25,19 +25,19 @@ const EntitySearch = {
     return String(entity.state ?? '').trim() !== '' && Number.isFinite(Number(entity.state));
   },
   value(entity) {
-    if (entity.state === 'unavailable') return 'Otillgänglig';
-    if (entity.state === 'unknown' || entity.state == null) return 'Okänt värde';
-    if (entity.state === 'on') return 'På · 1';
-    if (entity.state === 'off') return 'Av · 0';
+    if (entity.state === 'unavailable') return 'Unavailable';
+    if (entity.state === 'unknown' || entity.state == null) return 'Unknown value';
+    if (entity.state === 'on') return 'On · 1';
+    if (entity.state === 'off') return 'Off · 0';
     const number = Number(entity.state);
     const value = String(entity.state).trim() !== '' && Number.isFinite(number)
-      ? number.toLocaleString('sv-SE', {maximumFractionDigits: 6}) : String(entity.state);
+      ? number.toLocaleString('en-GB', {maximumFractionDigits: 6}) : String(entity.state);
     return value + (entity.unit ? ' ' + entity.unit : '');
   },
   filter(entities, query, domain = '', numericOnly = false) {
     return entities.filter(entity => (!domain || entity.entity_id.startsWith(domain + '.')) &&
       (!numericOnly || this.usable(entity)) && this.matches(entity, query))
-      .sort((a, b) => String(a.name || a.entity_id).localeCompare(String(b.name || b.entity_id), 'sv-SE') || a.entity_id.localeCompare(b.entity_id));
+      .sort((a, b) => String(a.name || a.entity_id).localeCompare(String(b.name || b.entity_id), 'en-GB') || a.entity_id.localeCompare(b.entity_id));
   }
 };
 if (typeof module !== 'undefined') module.exports = EntitySearch;

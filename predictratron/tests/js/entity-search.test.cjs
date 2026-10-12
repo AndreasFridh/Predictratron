@@ -36,11 +36,11 @@ test('type filters and model eligibility preserve unavailable historical sensors
   assert(search.usable({entity_id:'sensor.a',state:'unknown'}));
 });
 test('latest values include units, boolean meaning and explicit unavailable states', () => {
-  assert.equal(search.value(entities[0]), '21,75 °C');
-  assert.equal(search.value(entities[1]), 'Otillgänglig');
-  assert.equal(search.value(entities[3]), 'På · 1');
-  assert.equal(search.value({state:'off'}), 'Av · 0');
-  assert.equal(search.value({state:'unknown'}), 'Okänt värde');
+  assert.equal(search.value(entities[0]), '21.75 °C');
+  assert.equal(search.value(entities[1]), 'Unavailable');
+  assert.equal(search.value(entities[3]), 'On · 1');
+  assert.equal(search.value({state:'off'}), 'Off · 0');
+  assert.equal(search.value({state:'unknown'}), 'Unknown value');
 });
 
 test('repeated stars and unicode question marks remain predictable', () => {

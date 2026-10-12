@@ -1,308 +1,103 @@
-# Predictratron — flera modeller i en container
+# Predictratron — analysis flows
 
-Första fungerande versionen av en generell, lokal ML-app för Home Assistant.
-Skapa separata modellinstanser med egna inputs, mål, upplösning och prognoslängd.
-Exempel: temperatur → timförbrukning eller nederbörd + vecka → markvattennivå.
-ML-boxen väljer tidsperiod för både träning och prediktion: minut, timme, dygn,
-vecka eller ett eget fast intervall på 1–525 600 minuter.
+Predictratron trains independent time-series models and predicts future numeric values.
+Each analysis flow has its own signal graph, history, trained model and forecasts.
 
-## Starta
+## Navigation
 
-Med Docker Desktop eller Docker Engine och Compose:
+Expand or collapse the sidebar with the menu button. Its state is remembered in
+this browser. The collapsed sidebar leaves more room for the canvas and still
+lets you create a new analysis. Search by analysis name or ID, or filter by
+Running, Trained, Needs training and Error. Lists show 50 analyses at a time;
+use **Show 50 more** to display more results.
 
-```sh
-docker compose up -d --build
-```
+## Create an analysis
 
-Öppna [appen](http://localhost:8080). Den fungerar med CSV och de inbyggda
-demomodellerna även utan en HA-anslutning. Modeller, historik och träningsresultat
-sparas i datavolymen `predictor-data`.
+1. Choose **New analysis** for an independent canvas with an ML box.
+2. Add input signals and an output from **Signals**. Drag or click to add them.
+3. Open signal settings and choose a HA sensor or CSV column, name and data type.
+4. Connect input ports to ML, then connect ML to the output signal.
+5. Set the interval, forecast horizon and history window in **ML settings**.
+6. Choose **Save analysis**, then fetch HA history or import CSV.
+7. Choose **Train on history**, followed by **Predict future**.
+8. Open **Results** for forecasts, validation errors and comparison with a baseline.
 
-## Installera som Home Assistant-app
+Signals determine the history source. All connected measurement signals must
+map to HA sensors, or all must be CSV columns without HA mappings. Mixed HA/CSV
+history is not supported yet. Calendar and disconnected signals do not affect
+the source. Changing a target, interval or historical signal contract after
+import requires **Save as new analysis** to preserve existing history.
 
-Lägg till `https://github.com/AndreasFridh/Predictratron` som repository i
-Home Assistants appbutik. Installera **Predictratron**, starta appen och välj
-**Öppna webbgränssnitt**. Home Assistant OS eller Supervisor krävs.
+## Search HA signals
 
-## Anslut Home Assistant
+Use **Search HA signals** in the palette or **Search** beside a signal mapping.
+Search a name or entity ID. Plain text finds a substring, ignoring case.
+Wildcards match the whole name or ID: `*` means any characters and `?` one
+character. Examples: `sensor.*temp*`, `*kitchen*`, `sensor.energ?`.
 
-Vid installation genom appbutiken används appens egen Supervisor-inloggning
-automatiskt. Du behöver ingen egen token. Följande gäller separat Docker-drift.
+Results show the latest value, unit and update timestamp in the browser's time
+zone. Filter by sensor type. Results show 50 rows at a time. Values refresh when
+the picker opens and with **Refresh values**; they are snapshots, not a live feed.
+Unknown/unavailable sensors can have historical data. Text sensors cannot be
+selected; Boolean signals are supported only as inputs.
 
-Kopiera `.env.example` till `.env` och ange din HA-adress och befintliga
-API-inloggning. `HA_URL` är rotadressen utan `/api`.
-Hemligheter läses på servern och lämnas inte ut i appens API eller gränssnitt.
+## Intervals and aggregation
 
-```dotenv
-HA_URL=http://homeassistant.local:8123
-HA_TOKEN=din_befintliga_api_token
-APP_TOKEN=egen_nyckel_for_den_har_appen
-```
+Minute, hour, day, week and custom fixed intervals (1–525,600 minutes) are
+supported. Training and forecasting use the same interval. Weeks start Monday
+00:00 UTC. Calendar months and years are not supported. Interval timestamps label
+the end of each interval. Calendar features use the analysis time zone.
 
-Starta om tjänsten med `docker compose up -d --force-recreate`.
-Alternativt kan en hemlig fil monteras i containern och anges med
-`HA_TOKEN_FILE=/run/secrets/ha_token`.
-`HA_CA_FILE` kan peka på en monterad CA-fil vid egen certifikatutfärdare.
-HTTPS-certifikat verifieras; använd en adress som matchar certifikatet.
+Each signal can use mean or latest value. CSV interval values can be summed.
+Cumulative HA meters use reset-adjusted increments, requiring intervals divisible
+by five minutes. CSV may specify its original interval; only complete finished
+periods are aggregated. Upsampling, duplicate timestamps and infinite values are
+rejected. CSV timestamps need a time zone, and files must be at most 20 MB.
 
-Compose exponerar appen på **localhost**. Vid LAN-åtkomst ändrar du
-portbindningen till din serveradress och sätter `APP_TOKEN`.
-Webbläsaren frågar då efter appens nyckel. HA-nyckeln ska aldrig anges där.
+## Training and quality
 
-Appen kan nu installeras genom Home Assistants appbutik. Se repots README för
-installationslänken. Docker Compose är alternativet för en separat Docker-värd.
+The model uses lagged observed signals, rolling windows, calendar features and
+optional target history. Future weather forecasts are not yet inputs. Validation
+uses later history and removes overlapping future targets. Compare the model's
+MAE with its baseline; a model can perform worse than a simple latest-value forecast.
+The displayed band reflects historical error magnitude, not guaranteed coverage.
 
-## Arbetsflöde
+Training does not create a forecast. Prediction uses the saved trained model
+without retraining. Each analysis retains its own history and model artifact.
+Predictive changes require retraining. Stale history must be refreshed before
+forecasting. History requests support up to 3,650 days and 200,000 intervals,
+subject to data retained by Home Assistant.
 
-1. Välj **Ny modell** för en egen arbetsyta med en ML-box.
-2. Dra inputsignaler, kalenderfält och en output från **Signaler** till arbetsytan.
-3. Öppna signalens kugghjul och ange namn, datatyp och HA-sensor eller CSV-kolumn.
-4. Dra från inputsignalens cirkel till ML-boxens ingång, och från ML till output.
-5. Ange tidsperiod, prognoslängd och historikfönster i **ML-inställningar**.
-   Datakällan följer signalerna: HA-sensorer hämtar HA-historik, kolumner utan
-   HA-sensor använder CSV. Alla anslutna mätvärdessignaler behöver samma källa.
-   Tidsperioden kan också öppnas direkt med periodknappen i ML-boxen.
-6. Välj **Spara modell**. Kopplingarna avgör vilka signaler som används.
-7. Hämta HA-historik eller importera CSV via **Resultat**.
-8. Välj **1. Träna på historik** i ML-boxen. Det skapar och utvärderar instansens tränade modell.
-9. Välj **2. Prediktera framtid** för att använda den tränade modellen på senaste historiken.
-   Resultat visar framtida värden, testfel och jämförelseprognos. Prediktion tränar inte om modellen.
-10. Publicera manuellt i HA om du vill ha en prognossensor där.
+Automatic refresh is opt-in for HA analyses. Every 15 minutes it checks enabled
+analyses, fetches history and updates local forecasts, retraining after the chosen
+number of days. HA publication is manual and uses REST state creation, not a
+registered persistent integration. Forecasts are not actual energy consumption
+and should not be added as consumption in the Energy Dashboard.
 
-Varje ML-box har en egen modellinstans med identitet, sensorval, historik,
-träningsfil, kvalitetstest och prognos. Instanser delar inte tränade vikter eller
-historik. I denna version har varje instans en egen arbetsyta med en ML-box.
-Boxen visar mängden historik och har separata knappar för träning och prediktion.
-CSV kan importeras direkt från arbetsytan; HA-instansen har **Hämta historik**.
-Prediktionsknappen kräver en tränad modell och båda stegen låses medan instansen arbetar.
-Träningsjobb körs ett i taget för att begränsa
-resursanvändningen. Använd **Spara som ny modell** för att prova ett separat flöde.
-Noder kan flyttas och kopplingar tas bort genom att klicka på linjen. Klick på
-utgång och sedan ingång fungerar också. Positioner och kopplingar sparas per modell.
-En ändring av modellens inputs eller prognosinställningar kräver ny träning;
-flytt och namnbyte behåller träningen. Befintlig historik behålls när en input
-kopplas bort. Byte av datakälla, period eller målsignal efter import kräver en
-ny modell för att undvika att olika mätserier blandas. Radering av hela
-modellinstanser är inte implementerat.
+## Installation and persistence
 
-Signaler visas som **○ – Namn (Datatyp)**. Float är decimaltal, Integer är
-heltal och Boolean är 0/1. Output kan vara Float eller Integer; modellen gör
-numerisk regression. Vecka och andra kalenderfält skapas automatiskt.
+Add `https://github.com/AndreasFridh/Predictratron` to the HA app store repository
+list. Install Predictratron, start it, and open its web UI. HA OS or Supervisor on
+amd64 or aarch64 is required. The app uses its own Supervisor credential and
+Ingress. No separate HA URL or token is needed. History and model artifacts are
+stored in `/data` and included in app backups.
 
-**Automatisk uppdatering** hämtar historik och uppdaterar appens prognos var
-15:e minut när appen körs. Den tränar om efter det valda antalet dagar.
-Publicering till HA är i denna version ett separat, manuellt steg.
+For standalone Docker, run `docker compose up -d --build` in this directory.
+Open `http://localhost:8080`. Use `.env.example` for external HA connectivity.
+Keep API credentials on the server. `HA_TOKEN_FILE` can reference a mounted secret;
+`HA_CA_FILE` can reference a trusted CA. Standalone access can require `APP_TOKEN`.
+The Compose data volume persists across container replacement.
 
-## Vad betyder ett mätvärde?
+## Development builds and examples
 
-Alla tidsstämplar i appens lagring och API är i UTC och anger **slutet på
-en avslutad mätperiod**. En rad märkt `2026-10-11T10:00:00Z` beskriver alltså
-timmen 09:00–10:00 UTC. En prognospunkt innehåller både `start` och `end`.
-
-Timmodeller arbetar med 60 minuter. Dygnsmodeller arbetar med 24 timmar mellan
-UTC-midnätter. Veckomodeller arbetar med sju dygn, måndag 00:00 till nästa måndag
-00:00 UTC. Egna fasta intervall anges i minuter; veckomultiplar förankras i
-måndag och övriga intervall i Unix-epoken. De är inte lokala kalenderdygn på
-23/25 timmar vid sommartidsbyte. Kalendermånader och kalenderår stöds inte ännu.
-Kalenderfält beräknas i modellens valda tidszon, normalt Europe/Stockholm.
-
-**Veckosnitt:** välj en vecka i ML-boxen och medelvärde på outputsignalen.
-Fyra framtida perioder ger fyra separata framtida veckosnitt. Summor och senaste
-värde kan väljas per signal, exempelvis veckosumma för nederbörd och veckosnitt
-för vattennivå. Alla inputs sammanställs till samma period som output.
-Fördröjningar och historikfönster räknas i dessa valda perioder, alltså veckor
-för en veckomodell. Inställningsdialogen visar period och total prognoslängd.
-Grova perioder kräver lång historik: minst 100 användbara prognosstarter behövs
-även för veckomodeller. Veckovalet föreslår tre års historik.
-
-För HA-signaler väljer du:
-
-| Typ | Användning |
-| --- | --- |
-| Medelvärde | Temperatur, markfukt, vattennivå och andra mätvärden |
-| Senaste värde | Mätningen vid periodens slut; kräver tillgänglig state/raw-historik |
-| Mätarökning | Energi eller nederbörd från en ackumulerande mätare med HA:s förändringsstatistik |
-
-HA:s långtidsstatistik hämtas via WebSocket och resetjusterad `change` används
-för mätarökning. Därmed räknas en kumulativ energimätare inte som periodförbrukning.
-Om medelvärdes- eller senaste-värde-statistik saknas hämtas tillgänglig råhistorik
-via REST. Råa medelvärden vägs efter hur länge varje tillstånd gällt, inte bara
-antal uppdateringar. `on`/`off` blir 1/0. Okänd eller otillgänglig historik blir
-saknade värden, inte noll. Råhistoriken kan vara mycket kortare än långtidsstatistiken.
-
-Dygnsvärden byggs från 24 kompletta timvärden, veckor från 168. Ofullständiga
-perioder markeras som saknade. För intervall som inte är multiplar av en timme
-används HA:s femminutersstatistik om periodlängden är delbar med fem minuter;
-andra intervall använder tillgänglig råhistorik för medelvärde/senaste värde.
-Mätarökning kräver perioder delbara med fem minuter. Korttidsstatistik och
-råhistorik kan finnas för betydligt kortare tid än långtidsstatistik.
-En sensor med effekt i W behöver först omvandlas till energi om målet
-är kWh per timme. Appen gör ingen automatisk enhetskonvertering.
-
-## Exempel: markvattennivå
-
-- Mål: faktisk uppmätt vattennivå i cm, eller markfukt i % om det är det du mäter.
-- Input: nederbörd från en ackumulerande regnmätare.
-- Kalender: vecka och årstid.
-- Upplösning: ett dygn.
-- Prognos: sju dygn.
-- Fördröjningar: `0, 1, 2, 7, 14` dygn.
-- Historikfönster: `3, 7, 14` dygn; både summa och medelvärde räknas fram.
-- Tidigare målvärden: på.
-
-Modellen får därmed information om markens senaste nivå och regnet under flera
-föregående dygn. Grundvattennivå och markfukt är olika mätningar; välj den verkliga
-målsensorn och dess enhet. Det behövs observerade målvärden för att träna.
-Som jämförelse kan du skapa en kopia med tidigare målvärden avstängda och se om
-nederbörd och kalender ensamma tillför tillräcklig information.
-
-Den inbyggda markvattendemonstrationen använder **syntetiska** mätvärden.
-Den bevisar arbetsflödet, inte hydrologisk precision.
-
-## CSV-format
-
-CSV ska innehålla värden för avslutade perioder, med samma nycklar som modellens
-mål och inputs. Välj **CSV-radernas tidsperiod** före import. Standard är samma
-period som ML-boxen; tim- eller dygnsrader kan också sammanställas till veckor.
-Källperioden måste vara en jämn del av modellperioden. Uppsampling stöds inte.
-Vid sammanställning används signalens medelvärde, summa, mätarökning (summa av
-redan angivna periodökningar) eller senaste värde. Hela perioden måste finnas.
-CSV räknar inte differenser från kumulativa mätarställningar.
-`timestamp` måste ha tidszon, till exempel `Z` eller `+02:00`, och efter omräkning
-till UTC ligga på gränsen för vald källperiod. Veckor har måndagsgränser i UTC.
-Tomma celler är tillåtna; texter, oändliga värden, framtida tider och dubbla
-tidsstämplar nekas. Integer kräver heltal och Boolean kräver 0 eller 1.
-Import av samma tidsstämpel uppdaterar filens signalvärden; tidigare värden för
-signaler som tillfälligt kopplats bort behålls.
-
-```csv
-timestamp,water_level,rain
-2026-01-02T00:00:00Z,42.1,3.2
-2026-01-03T00:00:00Z,43.0,0.0
-```
-
-Här är `rain` nederbörd i respektive avslutat dygn, inte regnmätarens totalsiffra.
-Det behövs minst 100 användbara prognosstarter efter historikfönster, luckor och
-prognoslängd, samt tillräcklig historik för att skilja träning från test.
-
-## Modell och utvärdering
-
-Första versionen använder en Random Forest med flera framtida målvärden.
-Den predikterar varje framtida period direkt; egna prognoser matas inte tillbaka
-som om de vore uppmätta värden. Fördröjningar och rullande fönster använder enbart
-data fram till prognosstart. Kalenderfält använder cyklisk kodning.
-
-De sista cirka 20 procenten av användbara prognosstarter används som historiktest.
-Träningsstarter vars framtida målvärden överlappar testperioden tas bort.
-Saknade inputs kan ersättas med träningsperiodens median; målvärden ersätts aldrig
-för att skapa träningsetiketter. Senaste målvärdet och senaste inputs måste finnas
-för en ny prognos. Detaljerad utvärdering per prognosavstånd finns i API-resultatet.
-
-MAE är genomsnittligt absolut fel i målets enhet. Modellen jämförs med två enkla
-alternativ: senaste uppmätta värdet och samma tid förra veckan. Det bästa alternativet
-visas som jämförelse. En modell som inte slår det märks tydligt i gränssnittet.
-Diagrammet för historiktestet visar en period framåt; sammanfattat MAE omfattar
-hela den valda prognoslängden. Trädmodellens input-vikter är inga orsakssamband.
-
-Efter utvärderingen tränas den slutliga modellen om på all användbar historik.
-Prognosbandet använder 90:e percentilen av absoluta testfel per prognosavstånd.
-Det är en beskrivning av historisk felstorlek, inte ett separat kalibrerat
-konfidensintervall eller en garanti om framtida täckning.
-
-## Nuvarande gränser
-
-- Numeriska mål och inputs; binära HA-tillstånd stöds som 0/1. Kategorier och fria
-  texter behöver omvandlas innan de används.
-- Inputs är **observerad historik**. Framtida nederbörd, temperatur eller planerade
-  tillstånd tas inte in ännu. Modellen kan alltså inte veta att det ska regna i morgon.
-- Nästa utbyggnad bör spara väderprognoser med både utfärdandetid och giltighetstid.
-  Då kan framtida väder användas och testas utan att verkligt framtida väder råkar
-  ge ett orealistiskt bra historiktest.
-- Historikluckor interpoleras inte. Långa eller omfattande luckor kan ge för lite
-  träningsdata. All lagring sker lokalt; automatisk gallring finns inte ännu.
-- Färsk historik krävs. Vid eftersläpning kortas prognosen så att redan avslutade
-  prognosperioder inte skickas ut. Prognoser äldre än två mätperioder nekas via API.
-- Trädmodeller har begränsad förmåga att extrapolera långt utanför träningsvärdena.
-- HA-anslutningens faktiska sensorhistorik och precision ska valideras på din installation.
-
-## Output till Home Assistant
-
-Knappen **Publicera i HA** skapar eller uppdaterar `sensor.ml_<modell-id>` via
-HA:s REST-API. Tillståndet är värdet för nästa framtida prognosperiod.
-Attributen innehåller period, utfärdandetid och hela prognosserien.
-Demodata kan inte publiceras som verkliga HA-prognoser.
-
-En state som skapas så här är inte en registrerad integration och försvinner vid
-HA-omstart tills den publiceras igen. För kontinuerlig användning kan HA:s
-RESTful-sensor läsa `/api/models/<id>/forecast`, eller en riktig integration/MQTT
-discovery läggas till i nästa version. Prognossensorn ska inte behandlas som en
-mätare för faktisk energi i Energy Dashboard.
-
-## API
-
-API:t finns under `/api`. När `APP_TOKEN` är satt behövs
-`Authorization: Bearer <appens nyckel>`.
-
-| Metod | Sökväg | Funktion |
-| --- | --- | --- |
-| GET | `/status` | Konfigurationsstatus utan hemligheter |
-| GET | `/entities` | Valbara HA-sensorer |
-| GET / POST | `/models` | Lista eller skapa modellinstanser |
-| POST | `/graphs` | Skapa modell från noder och kopplingar |
-| PUT | `/models/<id>/graph` | Spara arbetsyta och härledda modellinställningar |
-| GET | `/models/<id>` | Inställningar, datamängd, status, testresultat och prognos |
-| GET | `/models/<id>/history` | Senaste 200 målvärdena |
-| POST | `/models/<id>/csv` | CSV-import; multipartfält `file`, valfritt `interval_minutes` för källperioden |
-| POST | `/models/<id>/actions/sync` | Hämta HA-historik |
-| POST | `/models/<id>/actions/train` | Träna och utvärdera |
-| POST | `/models/<id>/actions/forecast` | Gör prognos |
-| POST | `/models/<id>/actions/run` | Hämta HA-historik, träna och gör prognos |
-| POST | `/models/<id>/actions/publish` | Gör aktuell prognos och publicera i HA |
-| GET | `/models/<id>/forecast` | Läs aktuell prognos |
-| POST | `/demo/energy` eller `/demo/water` | Skapa syntetisk demomodell |
-
-Jobb körs i bakgrunden. Följ modellens `status` och `error` via GET.
-`/health` finns utanför API-autentiseringen för containerkontrollen.
-
-## Flera separata containrar
-
-Samma container kan innehålla många modellinstanser. För full isolering kan du
-köra fler containrar med olika portar och datavolymer, exempelvis:
+Release builds hide synthetic demo analyses and reject demo creation. Existing
+stored demo data is preserved. To enable examples in a local development build:
 
 ```sh
-docker run -d --name predictor-water -p 127.0.0.1:8081:8080 \
-  -v predictor-water-data:/data predictratron:0.3.1
+APP_BUILD=development docker compose up -d --build
 ```
 
-Dela inte samma datavolym mellan flera processer eller containrar.
-
-## Utveckling och kontroller
-
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -q
-.venv/bin/uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8080
-```
-
-Källor för anslutningsmetoder och tidsserieutvärdering:
-[HA REST API](https://developers.home-assistant.io/docs/api/rest/),
-[HA WebSocket API](https://developers.home-assistant.io/docs/api/websocket/),
-[HA statistik](https://data.home-assistant.io/docs/statistics/),
-[scikit-learn: fördröjda tidsseriefält](https://scikit-learn.org/stable/auto_examples/applications/plot_time_series_lagged_features.html).
-
-## Sök Home Assistant-signaler
-
-Välj **Sök HA-signaler** i signalpaletten, eller **Sök** vid en inputs eller
-outputs HA-sensor. Vanlig text söker i namn och entity-id utan skillnad på stora
-och små bokstäver. Wildcard matchar hela namn eller id: `*` betyder valfria
-tecken och `?` ett tecken. Exempel: `sensor.*temp*`, `*kök*`, `sensor.energ?`.
-
-Resultaten visar senaste värde, enhet och tid för senaste uppdatering i
-webbläsarens tidszon. Filtrera på sensorer, binära sensorer eller numeriska
-hjälpare. 50 resultat visas i taget; sök mer precist eller välj **Visa 50 till**.
-Värden hämtas när väljaren öppnas och med **Uppdatera värden**. Detta är en
-ögonblicksbild, inte en ständig liveuppdatering. Okända och otillgängliga signaler
-kan väljas eftersom historik kan finnas. Textsignaler kan inte väljas; Boolean
-kan bara användas som input. Att välja källa för en signal ändrar först formuläret
-– använd signalen och spara sedan modellen som vanligt.
+Alternatively, build with `docker build --build-arg APP_BUILD=development`.
+Regular builds default to `APP_BUILD=release`. Synthetic examples demonstrate the
+workflow and do not indicate accuracy in your home. The interface is English;
+user-provided analysis names, labels and HA sensor names are preserved.

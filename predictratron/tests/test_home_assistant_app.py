@@ -96,3 +96,21 @@ def test_ingress_rejects_non_supervisor_and_spoofed_forwarded_ip(tmp_path, monke
     with TestClient(app, client=('127.0.0.1', 50000)) as client:
         assert client.get('/health').status_code == 200
         assert client.get('/api/models').status_code == 403
+
+
+def test_release_build_has_no_demo_creation_or_demo_navigation(tmp_path):
+    with TestClient(create_app(tmp_path, HAClient(url='', token=''), dev_mode=False)) as client:
+        assert client.get('/api/status').json()['dev_mode'] is False
+        assert client.post('/api/demo/water').status_code == 404
+        from app.engine import demo_data
+        spec, _ = demo_data('water')
+        client.app.state.store.create(spec)
+        assert client.get('/api/models').json() == []
+        assert 'lang="en"' in client.get('/').text
+
+
+def test_development_build_retains_demo_examples(tmp_path):
+    with TestClient(create_app(tmp_path, HAClient(url='', token=''), dev_mode=True)) as client:
+        assert client.get('/api/status').json()['dev_mode'] is True
+        assert client.post('/api/demo/water').status_code == 201
+        assert len(client.get('/api/models').json()) == 1
