@@ -1,3 +1,11 @@
+# Verifiering — 12 oktober 2026, version 0.3.1
+
+- 59 Python-tester och 6 JavaScript-tester passerade.
+- Grafens anslutna signaler styr HA/CSV-källa; ML-boxens gamla källvärde kan inte
+  överstyra HA-kopplingar. Demokälla bevaras för syntetiska signaler.
+- Blandade HA/CSV-källor nekas och frånkopplade signaler påverkar inte källan.
+- I webbläsaren saknas datakällsvalet i ML-inställningar och inställningarna kan sparas.
+
 # Verifiering — 12 oktober 2026, version 0.3.0
 
 - 57 Python-tester och 6 JavaScript-tester passerade.

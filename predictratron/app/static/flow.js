@@ -39,7 +39,7 @@ class FlowEditor {
     $('remove-node').onclick=()=>this.removeNode();
     const legacySubmit=$('model-form').onsubmit;
     $('model-form').onsubmit=e=>{if(this.editingML)this.saveML(e);else legacySubmit(e);};
-    $('model-dialog').addEventListener('close',()=>{this.editingML=false;$('model-form').classList.remove('ml-edit-mode');});
+    $('model-dialog').addEventListener('close',()=>{$('model-form').elements.source.disabled=false;$('model-form').elements.auto_update.disabled=false;this.editingML=false;$('model-form').classList.remove('ml-edit-mode');});
     window.addEventListener('beforeunload',e=>{if(this.dirty){e.preventDefault();e.returnValue='';}});
   }
 
@@ -52,6 +52,14 @@ class FlowEditor {
 
   setEntities(entities) {
     this.entities=entities;
+  }
+
+  dataSource() {
+    if(!this.graph)return 'csv';
+    const box=this.graph.nodes.find(node=>node.kind==='ml');
+    const connected=this.graph.edges.map(edge=>edge.target===box.id?this.graph.nodes.find(node=>node.id===edge.source):edge.source===box.id?this.graph.nodes.find(node=>node.id===edge.target):null).filter(node=>node?.signal);
+    const mapped=connected.filter(node=>node.signal.entity_id).length;
+    return mapped===connected.length&&mapped>0?'ha':mapped>0?'mixed':box.config.source==='demo'?'demo':'csv';
   }
 
   makeGraph(spec, connected=true) {
@@ -101,10 +109,11 @@ class FlowEditor {
     $('flow-save-status').textContent=this.dirty?'Osparade ändringar':item?.graph?'Sparad arbetsyta':'Kopplingar från modellinställningarna';
     const busy=item?.status==='running';
     $('save-flow').disabled=busy;$('save-copy').disabled=busy;
-    $('flow-sync').hidden=box.config.source!=='ha';
+    const dataSource=this.dataSource();
+    $('flow-sync').hidden=dataSource!=='ha';
     $('flow-sync').disabled=busy||!item||this.dirty;
-    $('flow-import').hidden=box.config.source!=='csv';
-    $('csv-period-label').hidden=box.config.source!=='csv';
+    $('flow-import').hidden=dataSource!=='csv';
+    $('csv-period-label').hidden=dataSource!=='csv';
     $('csv-period').disabled=busy||!item||this.dirty;
     $('flow-import').disabled=busy||!item||this.dirty;
     document.querySelectorAll('[data-ml-action]').forEach(button=>{
@@ -304,7 +313,8 @@ class FlowEditor {
     openForm(box.config);this.editingML=true;
     const form=$('model-form');form.classList.add('ml-edit-mode');form.elements.name.value=box.config.name;
     if(!form.elements.source.querySelector('[value=demo]'))form.elements.source.add(new Option('Syntetisk demo','demo'));
-    form.elements.source.value=box.config.source;
+    form.elements.source.value=box.config.source;form.elements.source.disabled=true;
+    form.elements.auto_update.disabled=this.dataSource()!=='ha';
     $('target-section-title').textContent='Prognosinställningar';
     form.querySelector('.dialog-heading h2').textContent='ML-boxens inställningar';
     form.querySelector('[type=submit]').textContent='Använd inställningar';
@@ -316,7 +326,7 @@ class FlowEditor {
     try{
       const offsets=key=>String(fd.get(key)).split(',').map(s=>{if(!/^\s*\d+\s*$/.test(s))throw new Error('Ange heltal med kommatecken mellan.');return Number(s);});
       const bound=key=>fd.get(key)===''?null:Number(fd.get(key));
-      box.config={...box.config,name:fd.get('name'),source:fd.get('source'),unit:fd.get('unit'),resolution:fd.get('resolution'),period_minutes:Number(fd.get('period_minutes')),horizon:Number(fd.get('horizon')),timezone:fd.get('timezone'),lags:offsets('lags'),windows:offsets('windows'),use_target_history:fd.has('use_target_history'),minimum:bound('minimum'),maximum:bound('maximum'),auto_update:fd.get('source')==='ha'&&fd.has('auto_update'),history_days:Number(fd.get('history_days')),retrain_days:Number(fd.get('retrain_days'))};
+      box.config={...box.config,name:fd.get('name'),source:this.dataSource()==='mixed'?box.config.source:this.dataSource(),unit:fd.get('unit'),resolution:fd.get('resolution'),period_minutes:Number(fd.get('period_minutes')),horizon:Number(fd.get('horizon')),timezone:fd.get('timezone'),lags:offsets('lags'),windows:offsets('windows'),use_target_history:fd.has('use_target_history'),minimum:bound('minimum'),maximum:bound('maximum'),auto_update:this.dataSource()==='ha'&&fd.has('auto_update'),history_days:Number(fd.get('history_days')),retrain_days:Number(fd.get('retrain_days'))};
       $('model-dialog').close();this.renderNodes();this.markDirty();
     }catch(error){$('form-error').textContent=error.message;$('form-error').hidden=false;}
   }
@@ -332,6 +342,7 @@ class FlowEditor {
     try{
       const creating=copy||!this.modelId;
       const payload=structuredClone(this.graph);
+      if(this.dataSource()!=='mixed')payload.nodes.find(node=>node.kind==='ml').config.source=this.dataSource();
       if(copy)payload.nodes.find(n=>n.kind==='ml').config.name+=' · kopia';
       const item=await api(creating?'graphs':`models/${this.modelId}/graph`,{method:creating?'POST':'PUT',body:JSON.stringify(payload)});
       selected=item.id;this.modelId=item.id;this.graph=structuredClone(item.graph);this.isDraft=false;this.dirty=false;

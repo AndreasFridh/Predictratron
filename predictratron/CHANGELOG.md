@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Remove the data source selector from ML box settings.
+- Derive HA/CSV history from connected signal mappings, preserving synthetic demos.
+- Reject unsupported mixed HA/CSV connections; disconnected nodes do not affect the source.
+
 ## 0.3.0
 
 - Replace the long Home Assistant signal list with a searchable signal picker.

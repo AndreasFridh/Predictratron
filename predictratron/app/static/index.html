@@ -102,7 +102,7 @@
       <div class="dialog-heading"><div><div class="eyebrow">EN EGEN MODELLINSTANS</div><h2>Vad ska modellen lära sig?</h2></div><button type="button" class="close" id="close-dialog" aria-label="Stäng">×</button></div>
       <div class="form-grid">
         <label>Modellnamn<input name="name" required maxlength="100" placeholder="Till exempel markvattennivå"></label>
-        <label>Datakälla<select name="source"><option value="ha">Home Assistant</option><option value="csv">CSV-fil</option></select></label>
+        <label id="model-source-field">Datakälla<select name="source"><option value="ha">Home Assistant</option><option value="csv">CSV-fil</option></select></label>
       </div>
       <div class="form-section"><h3 id="target-section-title">Målet · det vi vill förutsäga</h3><div class="form-grid three" id="signal-target-fields">
         <label>Namn i modellen<input name="target_key" required pattern="[a-z][a-z0-9_]{0,39}" value="water_level"></label>

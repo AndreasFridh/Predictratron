@@ -70,7 +70,14 @@ class Graph(BaseModel):
         calendar_keys = [node.calendar for node in calendars]
         if len(calendar_keys) != len(set(calendar_keys)):
             raise ValueError("Samma kalenderfält kan bara kopplas in en gång")
+        signals = [outputs[0].signal, *[node.signal for node in inputs]]
+        ha_signals = [signal for signal in signals if signal.entity_id]
+        if ha_signals and len(ha_signals) != len(signals):
+            raise ValueError("Alla anslutna mätvärdessignaler behöver en HA-sensor, eller vara CSV-kolumner utan HA-sensor. Blandade datakällor stöds inte ännu.")
+        data_source = "ha" if ha_signals else "demo" if box.config.get("source") == "demo" else "csv"
         return ModelSpec.model_validate({**box.config,
+                                        "source": data_source,
+                                        "auto_update": data_source == "ha" and box.config.get("auto_update", False),
                                         "target": outputs[0].signal.model_dump(),
                                         "inputs": [node.signal.model_dump() for node in inputs],
                                         "calendar": calendar_keys})

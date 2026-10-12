@@ -43,7 +43,7 @@ def create_app(data_dir=None, ha=None):
             pass
         await asyncio.to_thread(service.close)
 
-    app = FastAPI(title="Predictratron", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Predictratron", version="0.3.1", lifespan=lifespan)
     app.state.store = store
     app.state.service = service
 
@@ -80,11 +80,11 @@ def create_app(data_dir=None, ha=None):
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": "0.3.0"}
+        return {"status": "ok", "version": "0.3.1"}
 
     @app.get("/api/status")
     def status():
-        return {"ha_configured": service.ha.configured, "version": "0.3.0"}
+        return {"ha_configured": service.ha.configured, "version": "0.3.1"}
 
     @app.get("/api/entities")
     def entities():

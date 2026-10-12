@@ -58,7 +58,9 @@ installationslänken. Docker Compose är alternativet för en separat Docker-vä
 2. Dra inputsignaler, kalenderfält och en output från **Signaler** till arbetsytan.
 3. Öppna signalens kugghjul och ange namn, datatyp och HA-sensor eller CSV-kolumn.
 4. Dra från inputsignalens cirkel till ML-boxens ingång, och från ML till output.
-5. Ange datakälla, tidsperiod, prognoslängd och historikfönster i **ML-inställningar**.
+5. Ange tidsperiod, prognoslängd och historikfönster i **ML-inställningar**.
+   Datakällan följer signalerna: HA-sensorer hämtar HA-historik, kolumner utan
+   HA-sensor använder CSV. Alla anslutna mätvärdessignaler behöver samma källa.
    Tidsperioden kan också öppnas direkt med periodknappen i ML-boxen.
 6. Välj **Spara modell**. Kopplingarna avgör vilka signaler som används.
 7. Hämta HA-historik eller importera CSV via **Resultat**.
@@ -269,7 +271,7 @@ köra fler containrar med olika portar och datavolymer, exempelvis:
 
 ```sh
 docker run -d --name predictor-water -p 127.0.0.1:8081:8080 \
-  -v predictor-water-data:/data predictratron:0.3.0
+  -v predictor-water-data:/data predictratron:0.3.1
 ```
 
 Dela inte samma datavolym mellan flera processer eller containrar.

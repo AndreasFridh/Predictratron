@@ -161,3 +161,28 @@ def test_disconnected_signal_history_is_preserved_during_import(tmp_path):
     graph.edges=original_edges
     store.save_graph(model_id,graph)
     pd.testing.assert_series_equal(store.frame(model_id)["rain"],frame["rain"],check_names=False,check_freq=False)
+
+
+def test_connected_signals_determine_history_source_not_ml_setting():
+    graph = water_graph()
+    for node in graph.nodes:
+        if node.signal:
+            node.signal.entity_id = 'sensor.' + node.signal.key
+    assert graph.compile().source == 'ha'
+    for node in graph.nodes:
+        if node.signal:
+            node.signal.entity_id = None
+    graph.nodes[3].config['source'] = 'ha'
+    assert graph.compile().source == 'csv'
+
+
+def test_mixed_history_sources_rejected_until_all_connected_signals_mapped():
+    graph = water_graph()
+    graph.nodes[0].signal.entity_id = 'sensor.rain'
+    with pytest.raises(ValueError, match='Blandade datakällor'):
+        graph.compile()
+    graph.nodes[-1].signal.entity_id = 'sensor.water_level'
+    assert graph.compile().source == 'ha'
+    graph.nodes[0].signal.entity_id = None
+    graph.edges = [edge for edge in graph.edges if edge.source != 'rain']
+    assert graph.compile().source == 'ha'
